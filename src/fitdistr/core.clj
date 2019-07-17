@@ -10,8 +10,6 @@
 (set! *unchecked-math* :warn-on-boxed)
 (m/use-primitive-operators)
 
-(defn fast+ {:inline (fn [^double x ^double y] `(+ ~x ~y)) :inline-arities #{2}} ^double [^double a ^double b] (+ a b))
-
 ;; targets
 
 (defn- log-likelihood [data] (fn [distr] (r/log-likelihood distr data)))
@@ -39,8 +37,8 @@
         obsp (mapv (fn [^long i] (/ (dec (* 2 i)) n2)) (range 1 (inc n)))]
     (fn [distr]
       (let [F (map (partial r/cdf distr) s)]
-        (+ f12 ^double (reduce fast+ 0.0 (map (fn [^double f ^double o]
-                                                (m/sq (- f o))) F obsp)))))))
+        (+ f12 ^double (reduce (fn [^double x ^double y] (+ x y)) 0.0 (map (fn [^double f ^double o]
+                                                                            (m/sq (- f o))) F obsp)))))))
 
 (defn- anderson-darling
   [data]
@@ -62,15 +60,16 @@
     :else (mapv #(m/norm % 0 (dec len) 0.00001 0.99999) (range 0 len))))
 
 (defn- qme
-  [quantiles strategy data]
+  [quantiles strategy measure data]
   (let [qs (cond
              (sequential? quantiles) quantiles
              (number? quantiles) (uniform-quantilies (long quantiles))
              :else (uniform-quantilies 50))
+        measure (if (= :mse measure) m/sq m/abs)
         data-qs (stats/quantiles data qs strategy)]
     (fn [distr]
-      (reduce fast+ (map (fn [^double q1 ^double q2]
-                           (m/sq (- q1 q2))) data-qs (map (partial r/icdf distr) qs))))))
+      (stats/mean (map (fn [^double q1 ^double q2]
+                         (measure (- q1 q2))) data-qs (map (partial r/icdf distr) qs))))))
 
 ;;
 
@@ -80,9 +79,9 @@
     :ks (kolmogorov-smirnov data)
     :cvm (cramer-von-mises data)
     :ad (anderson-darling data)
-    :qme (let [{:keys [quantiles strategy]
-                :or {quantiles 50 strategy :legacy}} params] (qme quantiles strategy data))
-    :ll (log-likelihood data)
+    :qme (let [{:keys [quantiles strategy qmeasure]
+                :or {quantiles 50 strategy :legacy qmeasure :mse}} params] (qme quantiles strategy qmeasure data))
+    :mle (log-likelihood data)
     (throw (Exception. (str "Method " method " is not supported.")))))
 
 (defn- aic-bic
@@ -98,8 +97,8 @@
                    (->> stats
                         (map #(vector % ((method->fn % data params) distr)))
                         (into {})))
-        res (if (contains? res :ll) ;; step 2, add aic and bic if log likelihood is available
-              (merge res (aic-bic (:ll res) (count data) npar))
+        res (if (contains? res :mle) ;; step 2, add aic and bic if log likelihood is available
+              (merge res (aic-bic (:mle res) (count data) npar))
               res)]
     (when res {:stats res})))
 
@@ -120,7 +119,7 @@
 (defn fit
   "Fit distribution using given method
 
-  * `:ll` - log likelihood
+  * `:mle` - log likelihood
   * `:ad` - Anderson-Darling (default)
   * `:ks` - Kolmogorov-Smirnov
   * `:cvm` - Cramer-von-Mises
@@ -170,7 +169,7 @@
      (when (:assert? params) (assert (validation data) "Data values do not fit required distribution"))
      (let [conf (zipmap param-names (inference data))
            distr (r/distribution distribution conf)]
-       (merge (calc-stats nil distr data (update params :stats conj :ll) nil (count param-names))
+       (merge (calc-stats nil distr data (update params :stats conj :mle) nil (count param-names))
               {:params conf
                :distribution-name distribution
                :distribution distr})))))
@@ -234,21 +233,21 @@
 
     (def target (r/->seq (r/distribution :weibull {:alpha 0.5 :beta 2.2}) 10000))
 
-    (fit :ad :weibull target {:stats [:ll]})
+    (fit :ad :weibull target {:stats [:mle]})
     ;; => {:stats
     ;;     {:ad 0.19749431207310408,
-    ;;      :ll -19126.212671469282,
+    ;;      :mle -19126.212671469282,
     ;;      :aic 38256.425342938564,
     ;;      :bic 38270.84602368252},
     ;;     :params {:alpha 0.5014214878565807, :beta 2.203213102262515},
     ;;     :distribution #object[org.apache.commons.math3.distribution.WeibullDistribution 0x430997b7 "org.apache.commons.math3.distribution.WeibullDistribution@430997b7"],
     ;;     :method :ad}
 
-    (bootstrap :ll :weibull target {:stats #{:ad}
-                                    :optimizer :nelder-mead})
+    (bootstrap :mle :weibull target {:stats #{:ad}
+                                     :optimizer :nelder-mead})
 
     ;; => {:stats
-    ;;     {:ll -19126.178345014738,
+    ;;     {:mle -19126.178345014738,
     ;;      :ad 0.35561024021990306,
     ;;      :aic 38256.356690029475,
     ;;      :bic 38270.77737077343},
@@ -258,9 +257,9 @@
     ;;     :params {:alpha 0.4983189798666845, :beta 2.222265620585455},
     ;;     :distribution #object[org.apache.commons.math3.distribution.WeibullDistribution 0x63a766b9 "org.apache.commons.math3.distribution.WeibullDistribution@63a766b9"]}
 
-    (infer :weibull target {:stats #{:ll :ad}})
+    (infer :weibull target {:stats #{:mle :ad}})
     ;; => {:stats
-    ;;     {:ll -19126.13369575803,
+    ;;     {:mle -19126.13369575803,
     ;;      :ad 0.22838225327177497,
     ;;      :aic 38256.26739151606,
     ;;      :bic 38270.68807226002},
@@ -277,15 +276,15 @@
 
     (defn find-best
       [method ds]
-      (let [selector (if (= method :ll) last first)]
-        (dissoc (->> (map #(fit method % atv {:stats #{:ll :ad :ks :cvm}}) ds)
+      (let [selector (if (= method :mle) last first)]
+        (dissoc (->> (map #(fit method % atv {:stats #{:mle :ad :ks :cvm}}) ds)
                      (sort-by (comp method :stats))
                      (selector))
                 :distribution)))
 
-    (find-best :ll [:weibull :log-normal :gamma :exponential :normal :pareto])
+    (find-best :mle [:weibull :log-normal :gamma :exponential :normal :pareto])
     ;; => {:stats
-    ;;     {:ll -532.4052019871922,
+    ;;     {:mle -532.4052019871922,
     ;;      :cvm 0.6373592936482382,
     ;;      :ks 0.1672497620724005,
     ;;      :ad 3.4721179220009617,
@@ -293,14 +292,14 @@
     ;;      :bic 1074.0991857726672},
     ;;     :params {:scale 2.553816262077493, :shape 3.147240361221695},
     ;;     :distribution-name :log-normal,
-    ;;     :method :ll}
+    ;;     :method :mle}
 
     (find-best :ad [:weibull :log-normal :gamma :exponential :normal :pareto])
     ;; => {:stats
     ;;     {:ad 3.0345123029861156,
     ;;      :cvm 0.4615381958965107,
     ;;      :ks 0.1332827771382316,
-    ;;      :ll -532.9364810533066,
+    ;;      :mle -532.9364810533066,
     ;;      :aic 1069.8729621066132,
     ;;      :bic 1075.161743904896},
     ;;     :params {:scale 2.2941800698596815, :shape 3.2934516278879205},
@@ -311,7 +310,7 @@
     ;; => {:stats
     ;;     {:ks 0.07692307692307693,
     ;;      :cvm 0.11739378941793886,
-    ;;      :ll ##-Inf,
+    ;;      :mle ##-Inf,
     ;;      :ad ##Inf,
     ;;      :aic ##Inf,
     ;;      :bic ##Inf},
@@ -319,9 +318,9 @@
     ;;     :distribution-name :pareto,
     ;;     :method :ks}
 
-    (fit :ll :pareto atv {:stats [:ll :ad :ks :cvm :qme]
-                          :optimizer :gradient
-                          :max-iters 1000})
+    (fit :mle :pareto atv {:stats [:mle :ad :ks :cvm :qme]
+                           :optimizer :gradient
+                           :max-iters 1000})
 
 
 

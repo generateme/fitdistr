@@ -1,11 +1,11 @@
 # (WIP) Distribution Fitting in Clojure
 
-Library provides set of functions to fit univariate distribution to your data.
+Library provides the set of functions to fit univariate distribution to your data.
 
 Entry point: `fit` function with supported methods:
 
-* Maximum log likelihood estimation - `:ll`
-* Maximum goodness-of-fit estimation
+* Maximum log likelihood estimation - `:mle`
+* Maximum goodness-of-fit estimation:
     * Kolmogorov-Smirnov - `:ks`
     * Cramer-von-Mises - `:cvm`
     * Anderson-Darling - `:ad`
@@ -13,12 +13,22 @@ Entry point: `fit` function with supported methods:
 
 Additionally you can use:
 
-* `bootstrap` function to generate parameters from optimized resampled data
-* `infer` function to generate parameters computationally from data
+* `bootstrap` to generate parameters from set of resampled data
+* `infer` to generate parameters computationally from data
 
 Library is highly based on [fitdistrplus](https://cran.r-project.org/web/packages/fitdistrplus/index.html) R package.
 
+For details please read [this paper](https://cran.r-project.org/web/packages/fitdistrplus/vignettes/paper2JSS.pdf).
+
 [fastmath](https://github.com/generateme/fastmath) distributions and optimization methods are used here.
+
+## How does it work?
+
+For every method target function is created which accepts distribution parameters and returns log-likelihood, MSE/MAE of quantiles or differences between cdfs. Such funcion is minimized or maximized using one of available algorithms (gradient based or simplex based). Optimization is bounded. Initial values for optimization are infered from data.
+
+For bootstrap sequences of resampled data is created and then each sequence is fitted. Best result (mean or median) is used as resulted parametrization. Additional information like confidence intervals (or other ranges like irq or min-max) are returned.
+
+For statistics values of the target function is returned for best parametrization. It's possible to calculate values of all measures.
 
 ## Usage
 
@@ -30,24 +40,26 @@ To run inference just call one of the following functions:
 
 where:
 
-* `method` is one of supported methods as a keyword
-* `distribution` is a name of the distribution as keywords (see below)
-* `data` any `sequable` of numbers
-* `params` (optional) method parametrization (see below)
+* `method` - one of supported methods as a keyword (like: `:mle` or `:qme`)
+* `distribution` - a name of the distribution as keywords (see below) (like: `:beta`)
+* `data` - any `sequable` of numbers
+* `params` - parametrization (optional, see below)
 
-All methods return map with keys:
+All methods return map with following keys:
 
 * `:params` - best parametrization 
 * `:distribution` - distribution object
+* `:distribution-name` - name of the distribution
+* `:method` - used fitting method
 * `:stats` - statistics (see below)
 
-When using bootstrap, additionally you receive:
+For bootstrap you receive additionally:
 
 * ci name - confidence interval (several methods, see below)
-* `:all-params` - (optionally) list of parameters for each resampled dataset
+* `:all-params` - (optional) list of parameters for each resampled dataset
 * `:params` - best parametrization (mean or median, depending on confidence interval)
 
-All methods check if data are suitable for given distribution.
+Some validations on data and initial parameters are made.
 
 ### Example 1
 
@@ -56,10 +68,10 @@ Proof that matching is accurate enough
 ```clojure
 (def target (r/->seq (r/distribution :weibull {:alpha 0.5 :beta 2.2}) 10000))
 
-(fit :ad :weibull target {:stats [:ll]})
+(fit :ad :weibull target {:stats [:mle]})
 ;; => {:stats
 ;;     {:ad 0.19749431207310408,
-;;      :ll -19126.212671469282,
+;;      :mle -19126.212671469282,
 ;;      :aic 38256.425342938564,
 ;;      :bic 38270.84602368252},
 ;;     :params {:alpha 0.5014214878565807, :beta 2.203213102262515},
@@ -67,11 +79,11 @@ Proof that matching is accurate enough
 ;;     :distribution #object[org.apache.commons.math3.distribution.WeibullDistribution 0x430997b7 "org.apache.commons.math3.distribution.WeibullDistribution@430997b7"],
 ;;     :method :ad}
 
-(bootstrap :ll :weibull target {:stats #{:ad}
+(bootstrap :mle :weibull target {:stats #{:ad}
                                 :optimizer :nelder-mead})
 
 ;; => {:stats
-;;     {:ll -19126.178345014738,
+;;     {:mle -19126.178345014738,
 ;;      :ad 0.35561024021990306,
 ;;      :aic 38256.356690029475,
 ;;      :bic 38270.77737077343},
@@ -82,9 +94,9 @@ Proof that matching is accurate enough
 ;;     :distribution-name :weibull,
 ;;     :distribution #object[org.apache.commons.math3.distribution.WeibullDistribution 0x63a766b9 "org.apache.commons.math3.distribution.WeibullDistribution@63a766b9"]}
 
-(infer :weibull target {:stats #{:ll :ad}})
+(infer :weibull target {:stats #{:mle :ad}})
 ;; => {:stats
-;;     {:ll -19126.13369575803,
+;;     {:mle -19126.13369575803,
 ;;      :ad 0.22838225327177497,
 ;;      :aic 38256.26739151606,
 ;;      :bic 38270.68807226002},
@@ -95,7 +107,7 @@ Proof that matching is accurate enough
 
 ### Example 2
 
-Search for best distribution and its parameters. Look at last example, where Pareto distribution is wrongly considered best.
+Search for the best distribution and its parameters. Look at last example where Pareto distribution is wrongly considered best.
 
 ```clojure
 (def atv [0.6 2.8 182.2 0.8 478.0 1.1 215.0 0.7 7.9 316.2 0.2 17780.0 7.8 100.0 0.9 180.0 0.3 300.9
@@ -108,15 +120,15 @@ Search for best distribution and its parameters. Look at last example, where Par
 
 (defn find-best
   [method ds]
-  (let [selector (if (= method :ll) last first)]
-    (dissoc (->> (map #(fit method % atv {:stats #{:ll :ad :ks :cvm}}) ds)
+  (let [selector (if (= method :mle) last first)]
+    (dissoc (->> (map #(fit method % atv {:stats #{:mle :ad :ks :cvm}}) ds)
                  (sort-by (comp method :stats))
                  (selector))
             :distribution)))
 
-(find-best :ll [:weibull :log-normal :gamma :exponential :normal :pareto])
+(find-best :mle [:weibull :log-normal :gamma :exponential :normal :pareto])
 ;; => {:stats
-;;     {:ll -532.4052019871922,
+;;     {:mle -532.4052019871922,
 ;;      :cvm 0.6373592936482382,
 ;;      :ks 0.1672497620724005,
 ;;      :ad 3.4721179220009617,
@@ -124,14 +136,14 @@ Search for best distribution and its parameters. Look at last example, where Par
 ;;      :bic 1074.0991857726672},
 ;;     :params {:scale 2.553816262077493, :shape 3.147240361221695},
 ;;     :distribution-name :log-normal,
-;;     :method :ll}
+;;     :method :mle}
 
 (find-best :ad [:weibull :log-normal :gamma :exponential :normal :pareto])
 ;; => {:stats
 ;;     {:ad 3.0345123029861156,
 ;;      :cvm 0.4615381958965107,
 ;;      :ks 0.1332827771382316,
-;;      :ll -532.9364810533066,
+;;      :mle -532.9364810533066,
 ;;      :aic 1069.8729621066132,
 ;;      :bic 1075.161743904896},
 ;;     :params {:scale 2.2941800698596815, :shape 3.2934516278879205},
@@ -142,7 +154,7 @@ Search for best distribution and its parameters. Look at last example, where Par
 ;; => {:stats
 ;;     {:ks 0.07692307692307693,
 ;;      :cvm 0.11739378941793886,
-;;      :ll ##-Inf,
+;;      :mle ##-Inf,
 ;;      :ad ##Inf,
 ;;      :aic ##Inf,
 ;;      :bic ##Inf},
@@ -161,15 +173,21 @@ A couple of words about distributions. All of them are backed by Apache Commons 
 * `probability` - pdf for continuous and probability for discrete densities
 * `sample` - random value from distribution
 
-Parameter names of given distribution match mostly Apache Commons Math scheme and can differ from other sources (like Wikipedia or R). The list of supported distributions can be obtained by calling `(keys (methods fitdistr.distributions/distribution-data))` and list of distribution parameters `(:param-names (fitdistr.distributions/distribution-data :weibull))`
+Parameter names for given distribution match mostly Apache Commons Math scheme and can differ from other sources (like Wikipedia or R). The list of supported distributions can be obtained by calling:
 
-Please refer [Apache Commons Math API](https://commons.apache.org/proper/commons-math/javadocs/api-3.6.1/org/apache/commons/math3/distribution/package-summary.html) 
+```clojure
+(sort (keys (methods fitdistr.distributions/distribution-data)))
+;; => (:beta :exponential :gamma :geometric :log-normal :negative-binomial :normal :pareto :poisson :weibull)
+```
+The list of distribution parameters can be checked by calling `(:param-names (fitdistr.distributions/distribution-data :weibull))`
+
+Please refer [Apache Commons Math API](https://commons.apache.org/proper/commons-math/javadocs/api-3.6.1/org/apache/commons/math3/distribution/package-summary.html) for all details.
 
 ### Optimization methods
 
-For `fit` and `bootstrap` functions, parameter optimization is used to minimize or maximize underlying target function.
+For `fit` and `bootstrap` functions parameter optimization is used to minimize or maximize underlying target function..
 
-To set method use `:optimizer` key in parameters, also optimizer tunning is possible:
+Set `:optimizer` to select optimizer. Optimizer tuning is possible by setting parameters listed below.
 
 * `:gradient`
     * `:gradient-size` - step size `h` in two-point finite difference formula used to calculate gradient
@@ -192,22 +210,23 @@ To set method use `:optimizer` key in parameters, also optimizer tunning is poss
     * `:stopping-radius`
 * `:powell` - also not statisfying
 
-All accept also:
+Parameters common to all optimizers.
 
 * `:rel` and `:abs` for relative and absolute accuracy
 * `:max-evals` for maximum number of function evaluation (default: no limit)
 * `:max-iters` for maximum number of iterations (default: 1000)
 
-Please refer [Apache Commons Math API](https://commons.apache.org/proper/commons-math/javadocs/api-3.6/org/apache/commons/math3/optim/package-summary.html) for meaning.
+Please refer [Apache Commons Math API](https://commons.apache.org/proper/commons-math/javadocs/api-3.6/org/apache/commons/math3/optim/package-summary.html) for details.
 
 ### Parametrization
 
 When calling fitting method you can provide additional parameters which are. All are optional.
 
-* `:stats` - set of requested fitting function values, the same as fitting methods, default: same as method or `:ll`
+* `:stats` - set of requested fitting function values, the same as fitting methods, default: same as method or `:mle`
 * `:initial` - vector of inital values for parameters, default: infered from data
-* `:quantiles` for `qme` - sequence of quantiles to match or number of quantiles (evenly distributed between 0 and 1), default: 50
-* `:strategy` for `qme` - quantile estimation strategy, one of `:legacy` `:r1` `:r2` `:r3` `:r4` `:r5` `:r6` `:r7` `:r8` `:r9`, default `:legacy`
+* `:quantiles` for `:qme` - sequence of quantiles to match or number of quantiles (evenly distributed between 0 and 1), default: 50
+* `:strategy` for `:qme` - quantile estimation strategy, one of `:legacy` `:r1` `:r2` `:r3` `:r4` `:r5` `:r6` `:r7` `:r8` `:r9`, default `:legacy`
+* `:qmeasure` for `:qme` - method of difference measurement, `:mse` (mean squared error) or `:mae` (mean absolute error), default `:mse`
 * `:optimizer` - as above, default: `:nelder-mead`
 * optimizer parameters - as above
 * `:size` for `bootstrap` - number of resampled data, default: 100
@@ -242,12 +261,12 @@ Example: values of each type for 10000 samples from N(0,1)
 ### Known issues
 
 - `:ad` in `mge` may converge slow
-- sometimes convergence hangs, try to play with optimizers and their parameter
+- sometimes convergence fails (for example `:gradient` on Pareto distribution using `:ad` method)
 
 ### TODO
 
-- more distribution
-- all `mge` methods (ADR, ADL, AD2R, AD2L, AD2)
+- more distributions
+- all `mge` methods (ADR, ADL, AD2R, AD2L, AD2) from fitdistrplus
 - more statistics (which?)
 
 ## License
