@@ -19,14 +19,14 @@
   (let [n (count data)
         s (sort data)
         obsp (map #(/ (double %) n) (range 0 (inc n)))
-        obspu (rest obsp)
-        obspl (butlast obsp)]
+        obspu (vec (rest obsp))
+        obspl (vec (butlast obsp))]
     (fn [distr]
       (let [F (map (partial r/cdf distr) s)
-            d (mapv (fn [^double u ^double f ^double l]
-                      (max (m/abs (- u f))
-                           (m/abs (- f l)))) obspu F obspl)]
-        (apply clojure.core/max d)))))
+            d (map (fn [^double u ^double f ^double l]
+                     (max (m/abs (- u f))
+                          (m/abs (- f l)))) obspu F obspl)]
+        (stats/maximum d)))))
 
 (defn- cramer-von-mises
   [data]
@@ -56,8 +56,10 @@
   (cond
     (< len 2) [0.5]
     (== len 2) [0.2 0.8]
-    (== len 3) [0.05 0.5 0.95]
-    :else (mapv #(m/norm % 0 (dec len) 0.00001 0.99999) (range 0 len))))
+    (== len 3) [0.25 0.5 0.75]
+    (== len 4) [0.2 0.4 0.6 0.8]
+    (== len 5) [0.05 0.25 0.5 0.75 0.95]
+    :else (mapv #(m/norm % 0 (dec len) 0.01 0.99) (range 0 len))))
 
 (defn- qme
   [quantiles strategy measure data]
@@ -116,6 +118,32 @@
                                  (<= x1 v x2)) initial bounds))
             "Initial values are out of bounds")))
 
+(defn- fit-
+  [target method distribution data {:keys [optimizer]
+                                    :or {optimizer :nelder-mead}
+                                    :as all}]
+  (let [{:keys [param-names bounds inference] :as ddata} (distribution-data distribution)]
+    (let [opt-fn (method->opt-fn method) ;; minimize or maximize?
+          [pars result] (opt-fn optimizer target (merge {:initial (inference data)
+                                                         :max-iters 1000} all {:bounds bounds 
+                                                                               :bounded? true
+                                                                               :stats? false})) ;; optimize!
+          
+          conf (zipmap param-names pars) ;; create final distribution parametrization...
+          distr (r/distribution distribution conf)] ;; ...and distribution
+      (merge (calc-stats method distr data all result (count param-names)) ;; return result and statistics
+             {:params conf
+              :distribution-name distribution
+              :distribution distr
+              :method method}))))
+
+(defn- make-target
+  [method distribution data all param-names]
+  (let [raw-target (method->fn method data all)]
+    (fn [& r]
+      (let [d (r/distribution distribution (zipmap param-names r))]
+        (raw-target d)))))
+
 (defn fit
   "Fit distribution using given method
 
@@ -137,34 +165,21 @@
 
   Other parameters and distribution names see README"
   ([method distribution data] (fit method distribution data {}))
-  ([method distribution data {:keys [optimizer assert?]
-                              :or {optimizer :nelder-mead assert? true}
+  ([method distribution data {:keys [assert?]
+                              :or {assert? true}
                               :as all}]
-   (let [{:keys [param-names bounds inference validation] :as ddata} (distribution-data distribution)]
+   (let [{:keys [param-names bounds validation]} (distribution-data distribution)]
      (when assert? (assert-values data bounds validation all))
-     (let [raw-target (method->fn method data all) ;; convert name to function working on distribution only
-           target (fn [& r]
-                    (let [d (r/distribution distribution (zipmap param-names r))]
-                      (raw-target d))) ;; target function for optimization
-           opt-fn (method->opt-fn method) ;; minimize or maximize?
-           [pars result] (opt-fn optimizer target (merge {:initial (inference data)
-                                                          :max-iters 1000} all {:bounds bounds 
-                                                                                :bounded? true
-                                                                                :stats? false})) ;; optimize!
-           
-           conf (zipmap param-names pars) ;; create final distribution parametrization...
-           distr (r/distribution distribution conf)] ;; ...and distribution
-       (merge (calc-stats method distr data all result (count param-names)) ;; return result and statistics
-              {:params conf
-               :distribution-name distribution
-               :distribution distr
-               :method method})))))
+     (fit- (make-target method distribution data all param-names) method distribution data all))))
+
 ;; 
 
 (defn infer
   "Infer parameters computationally"
   ([distribution data] (infer distribution data {}))
-  ([distribution data params]
+  ([distribution data {:keys [assert?]
+                       :or {assert? true}
+                       :as params}]
    (let [{:keys [param-names validation inference]} (distribution-data distribution)]
      (when (:assert? params) (assert (validation data) "Data values do not fit required distribution"))
      (let [conf (zipmap param-names (inference data))
@@ -227,6 +242,23 @@
        (if all-params? ;; maybe you want full list for each resampled data
          (assoc res :all-params all-params)
          res)))))
+
+#_(do (def target (r/->seq (r/distribution :gumbel {:mu 10 :beta 3.21}) 100000))
+
+      (take 10 target)
+
+      (count (:bins (stats/histogram target :sqrt)))
+
+      (time (bootstrap :mle :gumbel atv))
+
+      (def atv [0.6 2.8 182.2 0.8 478.0 1.1 215.0 0.7 7.9 316.2 0.2 17780.0 7.8 100.0 0.9 180.0 0.3 300.9
+                0.6 17.5 10.0 0.1 5.8 87.7 4.1 3.5 4.9 7060.0 0.2 360.0 100.8 2.3 12.3 40.0 2.3 0.1
+                2.7 2.2 0.4 2.6 0.2 1.0 7.3 3.2 0.8 1.2 33.7 14.0 21.4 7.7 1.0 1.9 0.7 12.6
+                3.2 7.3 4.9 4000.0 2.5 6.7 3.0 63.0 6.0 1.6 10.1 1.2 1.5 1.2 30.0 3.2 3.5 1.2
+                0.2 1.9 0.7 17.0 2.8 4.8 1.3 3.7 0.2 1.8 2.6 5.9 2.6 6.3 1.4 0.8 670.0 810.0
+                1890.0 1800.0 8500.0 21000.0 31.0 20.5 4370.0 1000.0 39891.8
+                316.2 6400.0 1000.0 7400.0 31622.8]))
+
 ;;----------------------------------------
 
 #_(do

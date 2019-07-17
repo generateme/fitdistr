@@ -1,6 +1,6 @@
 # (WIP) Distribution Fitting in Clojure
 
-Library provides the set of functions to fit univariate distribution to your data.
+Library provides the set of functions to fit univariate distribution to your (uncensored) data.
 
 Entry point: `fit` function with supported methods:
 

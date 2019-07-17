@@ -21,6 +21,11 @@
   [data]
   (double-array (map #(m/log ^double %) data)))
 
+(defn- continuous-mode
+  ^double [data]
+  (let [{:keys [^double step bins]} (stats/histogram data :sqrt)]
+    (+ (* 0.5 step) ^double (ffirst (sort-by second (fn [^double a ^double b] (> a b)) bins)))))
+
 (defmulti distribution-data (fn [k] k))
 
 ;; fitdistr.R
@@ -155,3 +160,49 @@
    :validation positives?
    :inference infer-pareto})
 
+(defmethod distribution-data :cauchy [_]
+  {:param-names [:median :scale]
+   :bounds [bfull b0+]
+   :validation all-accepted
+   :inference #(let [xs (double-array %)]
+                 [(stats/median xs) (* 0.5 (stats/iqr xs))])})
+
+(defmethod distribution-data :chi-squared [_]
+  {:param-names [:degrees-of-freedom]
+   :bounds [b0+]
+   :validation non-negatives?
+   :inference (comp vector stats/mean)})
+
+(defn- infer-f
+  [data]
+  (let [xs (double-array data)
+        m (stats/mean xs)
+        d2 (if (< 1.0 m 100.0) (/ (+ m m) (dec m)) 1.0)
+        p (/ d2 (+ d2 2.0))
+        mode (continuous-mode xs)
+        diff (- mode p)
+        d1 (if (neg? diff) (/ (* -2.0 p) diff) 1.0)]
+    [d1 d2]))
+
+(defmethod distribution-data :f [_]
+  {:param-names [:numerator-degrees-of-freedom :denominator-degrees-of-freedom]
+   :bounds [b0+ b0+]
+   :validation non-negatives?
+   :inference infer-f})
+
+(def ^:private ^:const ^double gumbel-const (+ m/GAMMA (m/ln (m/ln 2))))
+
+(defn- infer-gumbel
+  [data]
+  (let [xs (double-array data)
+        m (stats/mean xs)
+        median (stats/median xs)
+        beta (/ (- m median) gumbel-const)
+        mu (- m (* beta m/GAMMA))]
+    [mu beta]))
+
+(defmethod distribution-data :gumbel [_]
+  {:param-names [:mu :beta]
+   :bounds [bfull b0+]
+   :validation all-accepted
+   :inference infer-gumbel})
