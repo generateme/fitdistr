@@ -1,4 +1,4 @@
-# (WIP) Distribution Fitting in Clojure
+# Distribution Fitting in Clojure
 
 Library provides the set of functions to fit univariate distribution to your (uncensored) data.
 
@@ -361,6 +361,8 @@ Example: values of each type for 10000 samples from N(0,1)
 
 - `:ad` in `mge` may converge slow
 - sometimes convergence fails (for example `:gradient` on Pareto distribution using `:ad` method)
+- `:levy` requires `:gradient` optimizer to converge
+- `infer` doesn't return proper parameters in some cases for `:f`, `:nakagami`, `:levy`
 
 ### TODO
 

@@ -282,3 +282,20 @@
                                                :samples 100}))
 
 (save (show-scatter b-gamma) "utils/ex4-gamma-lowq.jpg")
+
+;;
+
+(show (xy-chart {:width 600 :height 600}
+                (b/series [:grid]
+                          [:function (partial r/pdf (r/distribution :levy {:mu 10 :c 10})) {:samples 600
+                                                                                            :domain [5 30]}])
+                (b/add-axes :left)
+                (b/add-axes :bottom)
+                (b/add-label :top "PDF")))
+
+(show (xy-chart {:width 600 :height 600}
+                (b/series [:grid]
+                          [:histogram (r/->seq (r/distribution :levy {:mu 10 :c 10}) 1000) {:bins 10}])
+                (b/add-axes :left)
+                (b/add-axes :bottom)
+                (b/add-label :top "PDF")))
