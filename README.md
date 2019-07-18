@@ -1,5 +1,7 @@
 # Distribution Fitting in Clojure
 
+`[generateme/fitdistr "0.0.1-SNAPSHOT"]`
+
 Library provides the set of functions to fit univariate distribution to your (uncensored) data.
 
 Entry point: `fit` function with supported methods:
