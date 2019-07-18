@@ -30,7 +30,7 @@ For every method target function is created which accepts distribution parameter
 
 For bootstrap, sequences of resampled data are created and then each sequence is fitted. Best result (mean or median) is used as a final parametrization. Additionally confidence interval (or other ranges like irq or min-max) is returned.
 
-Values of the any target function can be calculated.
+Values of the any target function can be calculated and returned as fitness measure.
 
 ## Usage
 
