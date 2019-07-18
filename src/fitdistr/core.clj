@@ -306,49 +306,6 @@
               1890.0 1800.0 8500.0 21000.0 31.0 20.5 4370.0 1000.0 39891.8
               316.2 6400.0 1000.0 7400.0 31622.8])
 
-    (defn find-best
-      [method ds]
-      (let [selector (if (= method :mle) last first)]
-        (dissoc (->> (map #(fit method % atv {:stats #{:mle :ad :ks :cvm}}) ds)
-                     (sort-by (comp method :stats))
-                     (selector))
-                :distribution)))
-
-    (find-best :mle [:weibull :log-normal :gamma :exponential :normal :pareto])
-    ;; => {:stats
-    ;;     {:mle -532.4052019871922,
-    ;;      :cvm 0.6373592936482382,
-    ;;      :ks 0.1672497620724005,
-    ;;      :ad 3.4721179220009617,
-    ;;      :aic 1068.8104039743844,
-    ;;      :bic 1074.0991857726672},
-    ;;     :params {:scale 2.553816262077493, :shape 3.147240361221695},
-    ;;     :distribution-name :log-normal,
-    ;;     :method :mle}
-
-    (find-best :ad [:weibull :log-normal :gamma :exponential :normal :pareto])
-    ;; => {:stats
-    ;;     {:ad 3.0345123029861156,
-    ;;      :cvm 0.4615381958965107,
-    ;;      :ks 0.1332827771382316,
-    ;;      :mle -532.9364810533066,
-    ;;      :aic 1069.8729621066132,
-    ;;      :bic 1075.161743904896},
-    ;;     :params {:scale 2.2941800698596815, :shape 3.2934516278879205},
-    ;;     :distribution-name :log-normal,
-    ;;     :method :ad}
-
-    (find-best :ks [:weibull :log-normal :gamma :exponential :normal :pareto])
-    ;; => {:stats
-    ;;     {:ks 0.07692307692307693,
-    ;;      :cvm 0.11739378941793886,
-    ;;      :mle ##-Inf,
-    ;;      :ad ##Inf,
-    ;;      :aic ##Inf,
-    ;;      :bic ##Inf},
-    ;;     :params {:scale 0.36510648416477365, :shape 0.2649915952623174},
-    ;;     :distribution-name :pareto,
-    ;;     :method :ks}
 
     (fit :mle :pareto atv {:stats [:mle :ad :ks :cvm :qme]
                            :optimizer :gradient

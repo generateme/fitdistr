@@ -107,7 +107,7 @@ Proof that matching is accurate enough
 
 ### Example 2
 
-Search for the best distribution and its parameters. Look at last example where Pareto distribution is wrongly considered best.
+Search for the best distribution and its parameters. Look at last example where Pareto distribution is wrongly considered best when using inadequate method.
 
 ```clojure
 (def atv [0.6 2.8 182.2 0.8 478.0 1.1 215.0 0.7 7.9 316.2 0.2 17780.0 7.8 100.0 0.9 180.0 0.3 300.9
@@ -162,6 +162,98 @@ Search for the best distribution and its parameters. Look at last example where 
 ;;     :distribution-name :pareto,
 ;;     :method :ks}
 ```
+
+![ex2](utils/ex2-cdf.jpg "Example 2 - cdf")
+
+### Example 3
+
+This is example from the paper mentioned above (chapter 2).
+
+Here, we try to match three distributions and using `qme` method.
+
+```clojure
+(def gb [30.0 10.0 20.0 24.0 20.0 24.0 40.0 20.0 50.0 30.0 26.0 44.0 25.0 20.0 40.0 100.0 30.0 80.0 50.0 40.0 20.0 50.0 50.0 50.0
+         50.0 80.0 80.0 20.0 60.0 50.0 50.0 50.0 50.0 60.0 50.0 50.0 50.0 50.0 17.0 120.0 80.0 100.0 80.0 100.0 50.0 70.0 50.0 50.0
+         50.0 30.0 90.0 125.0 50.0 25.0 50.0 75.0 100.0 60.0 100.0 11.5 100.0 100.0 50.0 40.0 50.0 50.0 50.0 150.0 50.0 80.0 100.0 100.0
+         80.0 20.0 30.0 100.0 70.0 100.0 80.0 80.0 50.0 50.0 50.0 70.0 25.0 40.0 100.0 25.0 130.0 100.0 60.0 60.0 100.0 50.0 50.0 50.0
+         50.0 50.0 50.0 100.0 30.0 50.0 50.0 50.0 100.0 50.0 50.0 75.0 25.0 20.0 75.0 50.0 50.0 100.0 100.0 80.0 130.0 200.0 40.0 64.0
+         40.0 80.0 80.0 79.0 80.0 105.0 51.0 130.0 105.0 105.0 80.0 80.0 40.0 40.0 50.0 105.0 105.0 80.0 105.0 40.0 50.0 130.0 105.0 80.0
+         40.0 80.0 50.0 100.0 200.0 79.0 150.0 80.0 80.0 80.0 80.0 80.0 65.0 130.0 40.0 80.0 80.0 80.0 130.0 51.0 130.0 80.0 80.0 130.0
+         51.0 25.0 79.0 80.0 50.0 51.0 50.0 105.0 80.0 80.0 130.0 130.0 80.0 51.0 50.0 130.0 115.0 115.0 200.0 160.0 105.0 80.0 80.0 80.0
+         130.0 130.0 80.0 51.0 50.0 130.0 105.0 105.0 80.0 105.0 80.0 60.0 51.0 105.0 80.0 51.0 40.0 130.0 130.0 40.0 32.0 80.0 25.0 80.0
+         80.0 80.0 40.0 130.0 130.0 40.0 75.0 40.0 80.0 80.0 150.0 52.5 130.0 80.0 80.0 75.0 40.0 25.5 51.0 50.0 80.0 51.0 130.0 130.0
+         51.0 130.0 80.0 130.0 80.0 130.0 130.0 25.5 117.0 130.0 80.0 80.0 80.0 80.0])
+
+```
+
+Histgram with density and cumulative histogram for data.
+
+![ex3-hist](utils/ex3-hist.jpg "Example 3 - histogram")
+![ex3-cumulative](utils/ex3-cumulative.jpg "Example 3 - cumulative histogram")
+
+
+```clojure
+(fit :qme :gamma gb {:stats [:mle]})
+;; => {:stats
+;;     {:qme 45.41350132338318,
+;;      :mle -1253.652887342403,
+;;      :aic 2511.305774684806,
+;;      :bic 2518.3804432188426},
+;;     :params {:scale 18.58013425207939, :shape 3.992585123164037},
+;;     :distribution-name :gamma,
+;;     :method :qme}
+
+(fit :qme :weibull gb {:stats [:mle]})
+;; => {:stats
+;;     {:qme 52.75300844658587,
+;;      :mle -1256.1208259372665,
+;;      :aic 2516.241651874533,
+;;      :bic 2523.3163204085704},
+;;     :params {:alpha 2.052173279173565, :beta 83.1667239954531},
+;;     :distribution-name :weibull,
+;;     :method :qme}
+
+(fit :qme :log-normal gb {:stats [:mle]})
+;; => {:stats
+;;     {:qme 58.022608223760685,
+;;      :mle -1267.6351159421142,
+;;      :aic 2539.2702318842285,
+;;      :bic 2546.3449004182658},
+;;     :params {:scale 4.204520160089395, :shape 0.46585471421274693},
+;;     :distribution-name :log-normal,
+;;     :method :qme}
+```
+
+Looks that `gamma` is the best.
+Let's see some plots:
+
+![ex3-pdf](utils/ex3-pdf.jpg "Example 3 - pdf")
+![ex3-qq](utils/ex3-qq.jpg "Example 3 - qq")
+![ex3-pp](utils/ex3-pp.jpg "Example 3 - pp")
+
+### Examples 4
+
+Bootstrap groundbeef data.
+
+```clojure
+(def b-gamma (f/bootstrap :qme :gamma gb {:all-params? true
+                                          :ci-type :min-max-mean
+                                          :size 10000
+                                          :samples 100}))
+
+(count (:all-params b-gamma))
+;; => 10000
+
+(:min-max-mean b-gamma)
+;; => {:scale [9.436000626775108 28.586945660073017 17.967024829900268],
+;;     :shape [2.5005015188673814 7.565181039020107 4.238506386828045]}
+```
+
+![ex4-gamma](utils/ex4-gamma.jpg "Example 4 - gamma")
+
+When low number of quantiles are used, different parameters are infered
+
+![ex4-gamma-lowq](utils/ex4-gamma-lowq.jpg "Example 4 - gamma low q")
 
 ### Distributions
 
