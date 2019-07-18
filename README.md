@@ -26,11 +26,11 @@ For details please read [this paper](https://cran.r-project.org/web/packages/fit
 
 ## How does it work?
 
-For every method target function is created which accepts distribution parameters and returns log-likelihood, MSE/MAE of quantiles or differences between cdfs. Such funcion is minimized or maximized using one of available algorithms (gradient based or simplex based). Optimization is bounded. Initial values for optimization are infered from data.
+For every method target function is created which accepts distribution parameters and returns log-likelihood, MSE/MAE of quantiles or differences between cdfs. Such function is minimized or maximized using one of available algorithms (gradient based or simplex based). Optimization is bounded. Initial values for optimization are infered from data.
 
-For bootstrap sequences of resampled data is created and then each sequence is fitted. Best result (mean or median) is used as resulted parametrization. Additional information like confidence intervals (or other ranges like irq or min-max) are returned.
+For bootstrap, sequences of resampled data are created and then each sequence is fitted. Best result (mean or median) is used as a final parametrization. Additionally confidence interval (or other ranges like irq or min-max) is returned.
 
-For statistics values of the target function is returned for best parametrization. It's possible to calculate values of all measures.
+Values of the any target function can be calculated.
 
 ## Usage
 
