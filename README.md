@@ -251,7 +251,14 @@ Bootstrap groundbeef data.
 
 ![ex4-gamma](utils/ex4-gamma.jpg "Example 4 - gamma")
 
-When low number of quantiles are used, different parameters are infered
+When low number of quantiles are used, different parameters are infered.
+
+```clojure
+(def b-gamma-lowq (f/bootstrap :qme :gamma gb {:all-params? true
+                                               :quantiles 3
+                                               :size 10000
+                                               :samples 100}))
+```
 
 ![ex4-gamma-lowq](utils/ex4-gamma-lowq.jpg "Example 4 - gamma low q")
 
