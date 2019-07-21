@@ -10,6 +10,10 @@
 (set! *unchecked-math* :warn-on-boxed)
 (m/use-primitive-operators)
 
+;;
+
+(defn- fast+ {:inline (fn [^double x ^double y] `(+ ~x ~y)) :inline-arities #{2}} ^double [^double a ^double b] (+ a b))
+
 ;; targets
 
 (defn- log-likelihood [data] (fn [distr] (r/log-likelihood distr data)))
@@ -37,8 +41,8 @@
         obsp (mapv (fn [^long i] (/ (dec (* 2 i)) n2)) (range 1 (inc n)))]
     (fn [distr]
       (let [F (map (partial r/cdf distr) s)]
-        (+ f12 ^double (reduce (fn [^double x ^double y] (+ x y)) 0.0 (map (fn [^double f ^double o]
-                                                                            (m/sq (- f o))) F obsp)))))))
+        (+ f12 ^double (reduce fast+ 0.0 (map (fn [^double f ^double o]
+                                                (m/sq (- f o))) F obsp)))))))
 
 (defn- anderson-darling
   [data]
@@ -49,6 +53,71 @@
       (let [F (map (partial r/cdf distr) s)
             res (- (- n) (stats/mean (map (fn [^double o ^double f ^double fr]
                                             (* o (+ (m/log f) (m/log (- 1.0 fr))))) obsp F (reverse F))))]
+        (if (m/nan? res) ##Inf res)))))
+
+(defn- anderson-darling-r
+  [data]
+  (let [n (count data)
+        hn (/ n 2)
+        s (sort data)
+        obsp (mapv (fn [^long i] (dec (* 2 i))) (range 1 (inc n)))]
+    (fn [distr]
+      (let [F (map (partial r/cdf distr) s)
+            res (- hn (* 2.0 ^double (reduce fast+ 0.0 F))
+                   (stats/mean (map (fn [^double o ^double fr]
+                                      (* o (m/log (- 1.0 fr)))) obsp (reverse F))))]
+        (if (m/nan? res) ##Inf res)))))
+
+(defn- anderson-darling-l
+  [data]
+  (let [n (count data)
+        n32 (* 1.5 n)
+        s (sort data)
+        obsp (mapv (fn [^long i] (dec (* 2 i))) (range 1 (inc n)))]
+    (fn [distr]
+      (let [F (map (partial r/cdf distr) s)
+            res (- (* 2.0 ^double (reduce fast+ 0.0 F)) n32
+                   (stats/mean (map (fn [^double o ^double f]
+                                      (* o (m/log f))) obsp F)))]
+        (if (m/nan? res) ##Inf res)))))
+
+(defn- anderson-darling-2r
+  [data]
+  (let [n (count data)
+        s (sort data)
+        obsp (mapv (fn [^long i] (dec (* 2 i))) (range 1 (inc n)))]
+    (fn [distr]
+      (let [F (map (partial r/cdf distr) s)
+            res (+ (* 2.0 ^double (reduce fast+ 0.0 (map (fn [^double f]
+                                                           (m/log (- 1.0 f))) F))
+                      (stats/mean (map (fn [^double o ^double fr]
+                                         (/ o (- 1.0 fr))) obsp (reverse F)))))]
+        (if (m/nan? res) ##Inf res)))))
+
+(defn- anderson-darling-2l
+  [data]
+  (let [n (count data)
+        s (sort data)
+        obsp (mapv (fn [^long i] (dec (* 2 i))) (range 1 (inc n)))]
+    (fn [distr]
+      (let [F (map (partial r/cdf distr) s)
+            res (+ (* 2.0 ^double (reduce fast+ 0.0 (map (fn [^double f]
+                                                           (m/log f)) F))
+                      (stats/mean (map (fn [^double o ^double f]
+                                         (/ o f)) obsp F))))]
+        (if (m/nan? res) ##Inf res)))))
+
+(defn- anderson-darling-2
+  [data]
+  (let [n (count data)
+        s (sort data)
+        obsp (mapv (fn [^long i] (dec (* 2 i))) (range 1 (inc n)))]
+    (fn [distr]
+      (let [F (map (partial r/cdf distr) s)
+            res (+ (* 2.0 ^double (reduce fast+ 0.0 (map (fn [^double f]
+                                                           (+ (m/log f) (m/log (- 1.0 f)))) F))
+                      (stats/mean (map (fn [^double o ^double f ^double fr]
+                                         (+ (/ o f) (/ o (- 1.0 fr)))) obsp F (reverse F)))))]
         (if (m/nan? res) ##Inf res)))))
 
 (defn- uniform-quantilies
@@ -81,6 +150,11 @@
     :ks (kolmogorov-smirnov data)
     :cvm (cramer-von-mises data)
     :ad (anderson-darling data)
+    :adr (anderson-darling-r data)
+    :adl (anderson-darling-l data)
+    :ad2r (anderson-darling-2r data)
+    :ad2l (anderson-darling-2l data)
+    :ad2 (anderson-darling-2 data)
     :qme (let [{:keys [quantiles strategy qmeasure]
                 :or {quantiles 50 strategy :legacy qmeasure :mse}} params] (qme quantiles strategy qmeasure data))
     :mle (log-likelihood data)
@@ -235,7 +309,8 @@
            conf (zipmap param-names params) ;; create distribution configuration
            distr (r/distribution distribution conf) ;; create distribution
            res (merge (calc-stats nil distr data (update all :stats conj method) nil (count param-names))
-                      {ci-type (zipmap param-names extents)
+                      {:ci (zipmap param-names extents)
+                       :ci-type ci-type
                        :params conf
                        :distribution-name distribution
                        :distribution distr})]

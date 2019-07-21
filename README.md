@@ -57,7 +57,8 @@ All methods return map with following keys:
 
 For bootstrap you receive additionally:
 
-* ci name - confidence interval (several methods, see below)
+* `:ci` - confidence interval (several methods, see below)
+* `:ci-type` - name of the interval method
 * `:all-params` - (optional) list of parameters for each resampled dataset
 * `:params` - best parametrization (mean or median, depending on confidence interval)
 
