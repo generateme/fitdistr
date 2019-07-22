@@ -10,7 +10,7 @@ Entry point: `fit` function with supported methods:
 * Maximum goodness-of-fit estimation:
     * Kolmogorov-Smirnov - `:ks`
     * Cramer-von-Mises - `:cvm`
-    * Anderson-Darling - `:ad`
+    * Anderson-Darling - `:ad`, `:adr`, `:adl`, `:ad2r`, `:ad2l` and `:ad2`
 * Quantile matching estimation - `:qme`
 
 Additionally you can use:
