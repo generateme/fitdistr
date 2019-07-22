@@ -89,9 +89,9 @@
     (fn [distr]
       (let [F (map (partial r/cdf distr) s)
             res (+ (* 2.0 ^double (reduce fast+ 0.0 (map (fn [^double f]
-                                                           (m/log (- 1.0 f))) F))
-                      (stats/mean (map (fn [^double o ^double fr]
-                                         (/ o (- 1.0 fr))) obsp (reverse F)))))]
+                                                           (m/log (- 1.0 f))) F)))
+                   (stats/mean (map (fn [^double o ^double fr]
+                                      (/ o (- 1.0 fr))) obsp (reverse F))))]
         (if (m/nan? res) ##Inf res)))))
 
 (defn- anderson-darling-2l
@@ -102,9 +102,9 @@
     (fn [distr]
       (let [F (map (partial r/cdf distr) s)
             res (+ (* 2.0 ^double (reduce fast+ 0.0 (map (fn [^double f]
-                                                           (m/log f)) F))
-                      (stats/mean (map (fn [^double o ^double f]
-                                         (/ o f)) obsp F))))]
+                                                           (m/log f)) F)))
+                   (stats/mean (map (fn [^double o ^double f]
+                                      (/ o f)) obsp F)))]
         (if (m/nan? res) ##Inf res)))))
 
 (defn- anderson-darling-2
@@ -115,9 +115,9 @@
     (fn [distr]
       (let [F (map (partial r/cdf distr) s)
             res (+ (* 2.0 ^double (reduce fast+ 0.0 (map (fn [^double f]
-                                                           (+ (m/log f) (m/log (- 1.0 f)))) F))
-                      (stats/mean (map (fn [^double o ^double f ^double fr]
-                                         (+ (/ o f) (/ o (- 1.0 fr)))) obsp F (reverse F)))))]
+                                                           (+ (m/log f) (m/log (- 1.0 f)))) F)))
+                   (stats/mean (map (fn [^double o ^double f ^double fr]
+                                      (+ (/ o f) (/ o (- 1.0 fr)))) obsp F (reverse F))))]
         (if (m/nan? res) ##Inf res)))))
 
 (defn- uniform-quantilies
@@ -180,7 +180,7 @@
 
 (defn- method->opt-fn
   [method]
-  (if (#{:ks :cvm :ad :qme} method) o/minimize o/maximize))
+  (if (= :mle method) o/maximize o/minimize))
 
 (defn- assert-values
   [data bounds validation {:keys [initial]}]
@@ -222,7 +222,8 @@
   "Fit distribution using given method
 
   * `:mle` - log likelihood
-  * `:ad` - Anderson-Darling (default)
+  * `:ad` - Anderson-Darling
+  * `:adr`, `:adl`, `:ad2r`, `:ad2l` and `:ad2` - Anderson-Darling variants
   * `:ks` - Kolmogorov-Smirnov
   * `:cvm` - Cramer-von-Mises
   * `:qme` - quantile matching estimation.
@@ -260,6 +261,7 @@
            distr (r/distribution distribution conf)]
        (merge (calc-stats nil distr data (update params :stats conj :mle) nil (count param-names))
               {:params conf
+               :method :infer
                :distribution-name distribution
                :distribution distr})))))
 
@@ -284,21 +286,21 @@
   
   Additional parameters:
 
-  * `:size` - number of bootstrapped sequences (default: 100)
-  * `:samples` - number of samples in each sequence (default: 10% of data, minimum 100, maximum 5000 samples)
+  * `:samples` - number of bootstrapped sequences (default: 100)
+  * `:size` - number of samples in each sequence (default: 10% of data, minimum 100, maximum 5000 samples)
   * `:ci-type` - confidence interval type (default: `:mad-median`)
   * `:all-params?` - fitted parameters for each sequence (default: false)"
   ([method distribution data] (bootstrap method distribution data {}))
   ([method distribution data {:keys [size samples ci-type all-params? assert?]
-                              :or {size 100
-                                   samples (m/constrain (* 0.1 (count data)) 100 5000)
+                              :or {samples 100
+                                   size (m/constrain (* 0.1 (count data)) 100 5000)
                                    ci-type :mad-median
                                    all-params? false
                                    assert? true}
                               :as all}]
    (let [{:keys [param-names bounds validation inference]} (distribution-data distribution)]
      (when assert? (assert-values data bounds validation all))
-     (let [bdata (stats/bootstrap data size samples) ;; create sequences of bootstrapped data
+     (let [bdata (stats/bootstrap data samples size) ;; create sequences of bootstrapped data
            res (pmap #(fit method distribution % (-> all
                                                      (dissoc :stats)
                                                      (assoc :assert? false))) bdata) ;; fit paralelly (do not calculate stats)
@@ -313,12 +315,14 @@
                        :ci-type ci-type
                        :params conf
                        :distribution-name distribution
-                       :distribution distr})]
+                       :distribution distr
+                       :method method
+                       :bootstrap? true})]
        (if all-params? ;; maybe you want full list for each resampled data
          (assoc res :all-params all-params)
          res)))))
 
-#_(def target (r/->seq (r/distribution :pascal {:p 0.3 :r 100}) 10000))
+#_(def target (r/->seq (r/distribution :rayleigh {:a -3 :c 2 :beta 3}) 10000))
 #_(take 10 target)
-#_(infer :pascal target)
-#_(time (fit :mle :pascal target))
+#_(infer :rayleigh target)
+#_(time (fit :mle :rayleigh target))

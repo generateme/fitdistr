@@ -23,7 +23,7 @@
 
 (defn- log-data
   [data]
-  (double-array (map #(m/log ^double %) data)))
+  (m/seq->double-array (map #(m/log ^double %) data)))
 
 (defn- filter-outliers
   [data]
@@ -58,7 +58,7 @@
 
 (defn- infer-normal
   [data]
-  (let [xs (double-array data)
+  (let [xs (m/seq->double-array data)
         m (stats/mean xs)
         s (stats/population-stddev xs)]
     [m s]))
@@ -84,7 +84,7 @@
 
 (defn- infer-negative-binomial
   [data]
-  (let [xs (double-array data)
+  (let [xs (m/seq->double-array data)
         m (stats/mean xs)
         v (stats/population-variance xs)
         ^double s (if (> v m) (/ (* m m) (- v m)) 100)
@@ -118,7 +118,7 @@
 
 (defn- infer-gamma
   [data]
-  (let [xs (double-array data)
+  (let [xs (m/seq->double-array data)
         m (stats/mean xs)
         v (stats/population-variance xs)
         vm (/ v m)]
@@ -143,7 +143,7 @@
 
 (defn- infer-beta
   [data]
-  (let [xs (double-array data)
+  (let [xs (m/seq->double-array data)
         m (stats/mean xs)
         v (stats/population-variance xs)
         aux (dec (/ (* m (- 1.0 m)) v))]
@@ -157,9 +157,9 @@
 
 (defn- infer-pareto
   [data]
-  (let [xs (double-array data)
+  (let [xs (m/seq->double-array data)
         m1 (stats/mean xs)
-        x1 (stats/minimum xs)
+        x1 (- (stats/minimum xs) 0.01)
         n (count data)
         nshape (/ (- (* n m1) x1)
                   (- m1 x1))
@@ -177,7 +177,7 @@
   {:param-names [:median :scale]
    :bounds [bfull b0+]
    :validation all-accepted
-   :inference #(let [xs (double-array %)]
+   :inference #(let [xs (m/seq->double-array %)]
                  [(stats/median xs) (* 0.5 (stats/iqr xs))])})
 
 (defmethod distribution-data :chi-squared [_]
@@ -188,7 +188,7 @@
 
 (defn- infer-f
   [data]
-  (let [xs (double-array data)
+  (let [xs (m/seq->double-array data)
         m (stats/mean xs)
         d2 (if (< 1.0 m 100.0) (/ (+ m m) (dec m)) 1.0)
         p (/ d2 (+ d2 2.0))
@@ -207,7 +207,7 @@
 
 (defn- infer-gumbel
   [data]
-  (let [xs (double-array data)
+  (let [xs (m/seq->double-array data)
         m (stats/mean xs)
         median (stats/median xs)
         beta (/ (- m median) gumbel-const)
@@ -222,7 +222,7 @@
 
 (defn- infer-laplace
   [data]
-  (let [xs (double-array data)
+  (let [xs (m/seq->double-array data)
         m (stats/mean data)
         s (stats/population-stddev data)]
     [m (/ s m/SQRT2)]))
@@ -235,8 +235,8 @@
 
 (defn- infer-levy
   [data]
-  (let [vs (double-array data)
-        m (stats/minimum vs)
+  (let [vs (m/seq->double-array data)
+        m (- (stats/minimum vs) 0.01)
         mode (continuous-mode (filter-outliers vs))
         c (* 3.0 (- mode m))] 
     [(- m (* 0.05 c)) c]))
@@ -249,7 +249,7 @@
 
 (defn- infer-logistic
   [data]
-  (let [vs (double-array data)
+  (let [vs (m/seq->double-array data)
         m (stats/mean vs)
         v (stats/population-variance vs)]
     [m (/ (m/sqrt (* 3.0 v)) m/PI)]))
@@ -286,7 +286,7 @@
 
 (defn- infer-binomial
   [data]
-  (let [vx (double-array data)
+  (let [vx (m/seq->double-array data)
         m (stats/mean vx)
         v (stats/population-variance vx)
         p (if (zero? m)
@@ -303,7 +303,7 @@
 
 (defn- infer-bernoulli
   [data]
-  (let [vx (double-array data)
+  (let [vx (m/seq->double-array data)
         m (stats/mean vx)
         v (stats/population-variance vx)
         p (if (zero? m)
@@ -318,6 +318,220 @@
    :validation zero-or-one
    :inference (comp vector stats/mean)})
 
+(defn- infer-inverse-gamma
+  [data]
+  (let [m1 (stats/mean data)
+        m2 (stats/mean (map m/sq data))
+        m12 (m/sq m1)
+        d (- m2 m12)
+        shape (/ (- (* 2.0 m2) m12) d)
+        scale (/ (* m1 m2) d)]
+    [shape scale]))
 
-#_(def target (r/->seq (r/distribution :bernoulli {:p 0.2 :trials 100}) 10000))
-#_(infer-binomial target)
+(defmethod distribution-data :inverse-gamma [_]
+  {:param-names [:alpha :beta]
+   :bounds [b0+ b0+]
+   :validation positives
+   :inference infer-inverse-gamma})
+
+(defonce ^:private ^:const ^double ll-const (* 2.0 (m/log 3.0)))
+
+(defn- infer-log-logistic
+  [data]
+  (let [xs (m/seq->double-array data)
+        beta (stats/median xs)
+        [p25 p75] (stats/quantiles xs [0.25 0.75])
+        shape (/ ll-const (- (m/log p75) (m/log p25)))]
+    [shape beta]))
+
+(defmethod distribution-data :log-logistic [_]
+  {:param-names [:alpha :beta]
+   :bounds [b0+ b0+]
+   :validation positives
+   :inference infer-log-logistic})
+
+(defn- infer-chi
+  [data]
+  (let [xs (m/seq->double-array data)
+        m2 (m/sq (stats/mean xs))
+        sd (stats/population-stddev xs)]
+    [(+ sd m2)]))
+
+(defmethod distribution-data :chi [_]
+  {:param-names [:nu]
+   :bounds [b1+]
+   :validation positives
+   :inference infer-chi})
+
+(defn- infer-chi-squared-noncentral
+  [data]
+  (let [xs (m/seq->double-array data)
+        m (stats/mean xs)
+        v (stats/population-variance xs)
+        l (* 0.5 (- v m m))]
+    [(- m l) l]))
+
+(defmethod distribution-data :chi-squared-noncentral [_]
+  {:param-names [:nu :lambda]
+   :bounds [b0+ b0+]
+   :validation positives
+   :inference infer-chi-squared-noncentral})
+
+(defn- infer-erlang
+  [data]
+  (let [xs (m/seq->double-array data)
+        m (stats/mean xs)
+        v (stats/population-variance xs)
+        l (/ m v)]
+    [(* m l) l]))
+
+(defmethod distribution-data :erlang [_]
+  {:param-names [:k :lambda]
+   :bounds [b1+ b0+]
+   :validation positives
+   :inference infer-erlang})
+
+(defn- infer-fatigue-life
+  [data]
+  (let [xs (m/seq->double-array data)
+        mu (- (stats/minimum xs) 0.01)
+        m (stats/mean xs)
+        v (stats/population-variance xs)
+        loc2 (m/sq (- m mu))
+        a (* 0.25 (- v (* 5.0 loc2)))
+        b (- v loc2)
+        c v
+        delta (- (* b b) (* 4.0 a c))
+        gamma2 (/ (- (- b) (m/sqrt delta))
+                  (+ a a))] 
+    [mu (/ (- m mu)
+           (inc (* 0.5 gamma2))) (m/sqrt gamma2)]))
+
+(defmethod distribution-data :fatigue-life [_]
+  {:param-names [:mu :beta :gamma]
+   :bounds [bfull b0+ b0+]
+   :validation all-accepted
+   :inference infer-fatigue-life})
+
+(defn- infer-frechet
+  [data]
+  (let [xs (m/seq->double-array data)
+        mu (- (stats/minimum xs) 0.01)]
+    (conj (vec (umontreal.ssj.probdist.FrechetDist/getMLE xs (alength xs) mu)) mu)))
+
+(defmethod distribution-data :frechet [_]
+  {:param-names [:alpha :beta :delta]
+   :bounds [b0+ b0+ bfull]
+   :validation all-accepted
+   :inference infer-frechet})
+
+(def ^:private infer-hyperbolic-secant infer-normal)
+
+(defmethod distribution-data :hyperbolic-secant [_]
+  {:param-names [:mu :sigma]
+   :bounds [bfull b0+]
+   :validation all-accepted
+   :inference infer-hyperbolic-secant})
+
+(defn- infer-inverse-gaussian
+  [data]
+  (let [m (stats/mean data)
+        rm (/ m)
+        s (/ (stats/mean (map (fn [^double x] (- (/ x) rm)) data)))]
+    [m s]))
+
+(defmethod distribution-data :inverse-gaussian [_]
+  {:param-names [:mu :lambda]
+   :bounds [b0+ b0+]
+   :validation positives
+   :inference infer-inverse-gaussian})
+
+(defn- infer-johnson-su
+  [data]
+  (let [xs (m/seq->double-array data)
+        m (stats/mean xs)
+        s (stats/population-stddev xs)]
+    [0.0 1.0 m (/ s 1.7)]))
+
+(defmethod distribution-data :johnson-su [_]
+  {:param-names [:gamma :delta :xi :lambda]
+   :bounds [bfull b0+ bfull b0+]
+   :validation all-accepted
+   :inference infer-johnson-su})
+
+(defn- infer-johnson-sb
+  [data]
+  (let [xs (m/seq->double-array data)
+        [^double mn ^double mx] (stats/extent xs)
+        xi (- mn 0.01)
+        lambda (+ 0.01 (- mx xi))
+        [gamma delta] (umontreal.ssj.probdist.JohnsonSBDist/getMLE xs (alength xs) xi lambda)]
+    [gamma delta xi lambda]))
+
+(defmethod distribution-data :johnson-sb [_]
+  {:param-names [:gamma :delta :xi :lambda]
+   :bounds [bfull b0+ bfull b0+]
+   :validation all-accepted
+   :inference infer-johnson-sb})
+
+(defn- infer-johnson-sl
+  [data]
+  (vec (umontreal.ssj.probdist.JohnsonSLDist/getMLE (m/seq->double-array data) (count data))))
+
+(defmethod distribution-data :johnson-sl [_]
+  {:param-names [:gamma :delta :xi :lambda]
+   :bounds [bfull b0+ bfull b0+]
+   :validation all-accepted
+   :inference infer-johnson-sl})
+
+(defn- infer-pearson-6
+  [data]
+  (vec (umontreal.ssj.probdist.Pearson6Dist/getMLE (m/seq->double-array data) (count data))))
+
+(defmethod distribution-data :pearson-6 [_]
+  {:param-names [:alpha1 :alpha2 :beta]
+   :bounds [b0+ b1+ b0+]
+   :validation positives
+   :inference infer-pearson-6})
+
+(defn- infer-power
+  [data]
+  (let [xs (m/seq->double-array data)
+        [^double mn ^double mx] (stats/extent xs)
+        mn- (- mn 0.01)
+        mx+ (+ mx 0.01)]
+    (concat [mn- mx+] (umontreal.ssj.probdist.PowerDist/getMLE xs (alength xs) mn mx))))
+
+(defmethod distribution-data :power [_]
+  {:param-names [:a :b :c]
+   :bounds [bfull bfull bfull]
+   :validation all-accepted
+   :inference infer-power})
+
+(defn- infer-triangular
+  [data]
+  (let [xs (m/seq->double-array data)
+        [^double mn ^double mx] (stats/extent xs)
+        mn- (- mn 0.01)
+        mx+ (+ mx 0.01)
+        m (stats/mean xs)]
+    [mn- (- (* 3.0 m) mn mx) mx+]))
+
+(defmethod distribution-data :triangular [_]
+  {:param-names [:a :c :b]
+   :bounds [bfull bfull bfull]
+   :validation all-accepted
+   :inference infer-triangular})
+
+(defn- infer-rayleigh
+  [data]
+  (let [xs (m/seq->double-array data)
+        mn (stats/minimum xs)
+        mn- (- mn 0.01)]
+    (concat [mn-] (umontreal.ssj.probdist.RayleighDist/getMLE xs (alength xs) mn))))
+
+(defmethod distribution-data :rayleigh [_]
+  {:param-names [:a :beta]
+   :bounds [bfull b0+]
+   :validation all-accepted
+   :inference infer-rayleigh})

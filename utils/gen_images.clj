@@ -247,13 +247,13 @@
 
 (def b-gamma (f/bootstrap :qme :gamma gb {:all-params? true
                                           :ci-type :min-max-mean
-                                          :size 10000
-                                          :samples 100}))
+                                          :samples 10000
+                                          :size 100}))
 
 (count (:all-params b-gamma))
 ;; => 10000
 
-(:min-max-mean b-gamma)
+(:ci b-gamma)
 ;; => {:scale [9.436000626775108 28.586945660073017 17.967024829900268],
 ;;     :shape [2.5005015188673814 7.565181039020107 4.238506386828045]}
 
@@ -278,8 +278,8 @@
 
 (def b-gamma-lowq (f/bootstrap :qme :gamma gb {:all-params? true
                                                :quantiles 3
-                                               :size 10000
-                                               :samples 100}))
+                                               :samples 10000
+                                               :size 100}))
 
 (save (show-scatter b-gamma) "utils/ex4-gamma-lowq.jpg")
 
@@ -287,8 +287,8 @@
 
 (show (xy-chart {:width 600 :height 600}
                 (b/series [:grid]
-                          [:function (partial r/pdf (r/distribution :levy {:mu 10 :c 10})) {:samples 600
-                                                                                            :domain [5 30]}])
+                          [:function (partial r/pdf (r/distribution :watson-g {:n 40})) {:samples 600
+                                                                                         :domain [-2 2]}]                          )
                 (b/add-axes :left)
                 (b/add-axes :bottom)
                 (b/add-label :top "PDF")))
@@ -299,3 +299,5 @@
                 (b/add-axes :left)
                 (b/add-axes :bottom)
                 (b/add-label :top "PDF")))
+
+;;

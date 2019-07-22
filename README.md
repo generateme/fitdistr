@@ -1,6 +1,6 @@
 # Distribution Fitting in Clojure
 
-`[generateme/fitdistr "0.0.1-SNAPSHOT"]`
+`[generateme/fitdistr "1.0.0-SNAPSHOT"]`
 
 Library provides the set of functions to fit univariate distribution to your (uncensored) data.
 
@@ -241,13 +241,13 @@ Bootstrap groundbeef data.
 ```clojure
 (def b-gamma (f/bootstrap :qme :gamma gb {:all-params? true
                                           :ci-type :min-max-mean
-                                          :size 10000
-                                          :samples 100}))
+                                          :samples 10000
+                                          :size 100}))
 
 (count (:all-params b-gamma))
 ;; => 10000
 
-(:min-max-mean b-gamma)
+(:ci b-gamma)
 ;; => {:scale [9.436000626775108 28.586945660073017 17.967024829900268],
 ;;     :shape [2.5005015188673814 7.565181039020107 4.238506386828045]}
 ```
@@ -259,8 +259,8 @@ When low number of quantiles are used, different parameters are infered.
 ```clojure
 (def b-gamma-lowq (f/bootstrap :qme :gamma gb {:all-params? true
                                                :quantiles 3
-                                               :size 10000
-                                               :samples 100}))
+                                               :samples 10000
+                                               :size 100}))
 ```
 
 ![ex4-gamma-lowq](utils/ex4-gamma-lowq.jpg "Example 4 - gamma low q")
@@ -278,8 +278,45 @@ A couple of words about distributions. All of them are backed by Apache Commons 
 Parameter names for given distribution match mostly Apache Commons Math scheme and can differ from other sources (like Wikipedia or R). The list of supported distributions can be obtained by calling:
 
 ```clojure
-(sort (keys (methods fitdistr.distributions/distribution-data)))
-;; => (:beta :exponential :gamma :geometric :log-normal :negative-binomial :normal :pareto :poisson :weibull)
+(sort (keys (methods distribution-data)))
+;; => (:bernoulli
+;;     :beta
+;;     :binomial
+;;     :cauchy
+;;     :chi
+;;     :chi-squared
+;;     :chi-squared-noncentral
+;;     :erlang
+;;     :exponential
+;;     :f
+;;     :fatigue-life
+;;     :frechet
+;;     :gamma
+;;     :geometric
+;;     :gumbel
+;;     :hyperbolic-secant
+;;     :inverse-gamma
+;;     :inverse-gaussian
+;;     :johnson-sb
+;;     :johnson-sl
+;;     :johnson-su
+;;     :laplace
+;;     :levy
+;;     :log-logistic
+;;     :log-normal
+;;     :logistic
+;;     :nakagami
+;;     :negative-binomial
+;;     :normal
+;;     :pareto
+;;     :pascal
+;;     :pearson-6
+;;     :poisson
+;;     :power
+;;     :rayleigh
+;;     :t
+;;     :triangular
+;;     :weibull)
 ```
 The list of distribution parameters can be checked by calling `(:param-names (fitdistr.distributions/distribution-data :weibull))`
 
@@ -331,8 +368,8 @@ When calling fitting method you can provide additional parameters which are. All
 * `:qmeasure` for `:qme` - method of difference measurement, `:mse` (mean squared error) or `:mae` (mean absolute error), default `:mse`
 * `:optimizer` - as above, default: `:nelder-mead`
 * optimizer parameters - as above
-* `:size` for `bootstrap` - number of resampled data, default: 100
-* `:samples` for `bootstrap` - number of samples in sequence, default: 10% of data, minimum 100, maximum 5000 samples
+* `:samples` for `bootstrap` - number of resampled data, default: 100
+* `:size` for `bootstrap` - size of the sequence, default: 10% of data, minimum 100, maximum 5000
 * `:ci-type` for `bootstrap` - interval type (see below), default: `:mad-median`
 * `:all-params?` for `bootstrap` - return list of parameters for each resampled sequence, default: `false`
 
@@ -365,12 +402,17 @@ Example: values of each type for 10000 samples from N(0,1)
 - `:ad` in `mge` may converge slow
 - sometimes convergence fails (for example `:gradient` on Pareto distribution using `:ad` method)
 - `:levy` requires `:gradient` optimizer to converge
+- `:johnson-su` inference only for xi and lambda, fits well
+- `:johnson-sl` inference doesn't calculate `gamma`, doesn't fit well
+- `:johnson-sb` inference is wrongm, but fits well
+- `:frechet` inference is wrong, but fits well
+- for `:triangular` use inference only
 - `infer` doesn't return proper parameters in some cases for `:f`, `:nakagami`, `:levy`
 
 ### TODO
 
 - more distributions
-- all `mge` methods (ADR, ADL, AD2R, AD2L, AD2) from fitdistrplus
+- maybe `mme`
 - more statistics (which?)
 
 ## License
