@@ -1,7 +1,6 @@
 (ns fitdistr.distributions
   "Distributions information necessary to infer parameters."
   (:require [fastmath.core :as m]
-            [fastmath.random :as r]
             [fastmath.stats :as stats]))
 
 (set! *warn-on-reflection* true)
@@ -223,8 +222,8 @@
 (defn- infer-laplace
   [data]
   (let [xs (m/seq->double-array data)
-        m (stats/mean data)
-        s (stats/population-stddev data)]
+        m (stats/mean xs)
+        s (stats/population-stddev xs)]
     [m (/ s m/SQRT2)]))
 
 (defmethod distribution-data :laplace [_]

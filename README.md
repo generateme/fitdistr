@@ -12,6 +12,7 @@ Entry point: `fit` function with supported methods:
     * Cramer-von-Mises - `:cvm`
     * Anderson-Darling - `:ad`, `:adr`, `:adl`, `:ad2r`, `:ad2l` and `:ad2`
 * Quantile matching estimation - `:qme`
+* Method of moments (modified) - `:mme`
 
 Additionally you can use:
 
@@ -31,6 +32,10 @@ For every method target function is created which accepts distribution parameter
 For bootstrap, sequences of resampled data are created and then each sequence is fitted. Best result (mean or median) is used as a final parametrization. Additionally confidence interval (or other ranges like irq or min-max) is returned.
 
 Values of the any target function can be calculated and returned as fitness measure.
+
+### Method of moments - modified version
+
+Distributions implementation don't provide higher order moments but can calculate mean (first moment) and variance (second central moment). MME method uses both to match empirical mean and variance (regardless number of parameters to estimate). MSE or MAE is used as a target for optimization.
 
 ## Usage
 
@@ -234,7 +239,7 @@ Let's see some plots:
 ![ex3-qq](utils/ex3-qq.jpg "Example 3 - qq")
 ![ex3-pp](utils/ex3-pp.jpg "Example 3 - pp")
 
-### Examples 4
+### Example 4
 
 Bootstrap groundbeef data.
 
@@ -365,7 +370,7 @@ When calling fitting method you can provide additional parameters which are. All
 * `:initial` - vector of inital values for parameters, default: infered from data
 * `:quantiles` for `:qme` - sequence of quantiles to match or number of quantiles (evenly distributed between 0 and 1), default: 50
 * `:strategy` for `:qme` - quantile estimation strategy, one of `:legacy` `:r1` `:r2` `:r3` `:r4` `:r5` `:r6` `:r7` `:r8` `:r9`, default `:legacy`
-* `:qmeasure` for `:qme` - method of difference measurement, `:mse` (mean squared error) or `:mae` (mean absolute error), default `:mse`
+* `:mse?` for `:qme` and `:mme` - method of difference measurement, `true` - mean squared error or `false` - mean absolute error, default `true`
 * `:optimizer` - as above, default: `:nelder-mead`
 * optimizer parameters - as above
 * `:samples` for `bootstrap` - number of resampled data, default: 100
@@ -397,23 +402,37 @@ Example: values of each type for 10000 samples from N(0,1)
  :min-max-mean (-3.9825 4.7877 0.0047)}
 ```
 
+### Common problems
+
+* parametrization goes outside possible range or are unrealistic
+* optimization does not converge
+* log-likelihood (or other statistics) are infinite or NaN
+* everything is slow when dataset is huge
+
+Possible strategies, try different:
+
+* inital values for optimization, internally infered are used but you can set your own setting `:initial` parameter.
+* optimization method, sometimes `:gradient` works best, sometimes `:powell`
+* fitting method, `:mle` and `:ad` family are based on `log` function which returns `##-Inf` for probability 0.0. Optimizers can fall into the trap. Often `:ks` and `:qme` are enough. When using `:qme` play with quantiles.
+* target distribution
+
+Also instead on fitting you can rely on `bootstrap` (espacially for big datasets).
+
 ### Known issues
 
-- `:ad` in `mge` may converge slow
-- sometimes convergence fails (for example `:gradient` on Pareto distribution using `:ad` method)
-- `:levy` requires `:gradient` optimizer to converge
-- `:johnson-su` inference only for xi and lambda, fits well
-- `:johnson-sl` inference doesn't calculate `gamma`, doesn't fit well
-- `:johnson-sb` inference is wrongm, but fits well
-- `:frechet` inference is wrong, but fits well
-- for `:triangular` use inference only
-- `infer` doesn't return proper parameters in some cases for `:f`, `:nakagami`, `:levy`
+* `:ad` in `mge` may converge slow
+* sometimes convergence fails (for example `:gradient` on Pareto distribution using `:ad` method)
+* `:levy` requires `:gradient` optimizer to converge
+* `:johnson-su` inference only for xi and lambda, fits well
+* `:johnson-sl` inference doesn't calculate `gamma`, doesn't fit well
+* `:johnson-sb` inference is wrongm, but fits well
+* `:frechet` inference is wrong, but fits well
+* for `:triangular` use inference only
+* `infer` doesn't return proper parameters in some cases for `:f`, `:nakagami`, `:levy`
 
 ### TODO
 
-- more distributions
-- maybe `mme`
-- more statistics (which?)
+- more statistics (chi-squared test, etc)
 
 ## License
 

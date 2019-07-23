@@ -160,6 +160,32 @@
     (is (= 82.87 (m/approx (get-in f [:params :beta]))))
     (is (= :qme (:method f)))))
 
+;; mme
+
+;; qme
+
+(deftest mme-norm
+  (let [rng (r/rng :mersenne 1234)
+        data (r/->seq (r/distribution :normal {:rng rng}) 100)
+        f (fit :mme :normal data {:mse? false
+                                  :stats [:mle]})]
+    (is (= -132.76146656358625 (get-in f [:stats :mle])))
+    (is (= 4.921066679153263E-11 (get-in f [:stats :mme])))
+    (is (= 269.5229331271725 (get-in f [:stats :aic])))
+    (is (= 274.7332734991487 (get-in f [:stats :bic])))
+    (is (= -0.060565118483739126 (get-in f [:params :mu])))
+    (is (= 0.9172971003051852 (get-in f [:params :sd])))
+    (is (= :mme (:method f)))))
+
+(deftest mme-gb
+  (let [f (fit :mme :weibull gb-serving {:stats [:mle]
+                                         :quantiles 1000})]
+    (is (= 2.206E-11 (m/approx (get-in f [:stats :mme]) 14)))
+    (is (= -1255.25 (m/approx (get-in f [:stats :mle]))))
+    (is (= 2.16 (m/approx (get-in f [:params :alpha]))))
+    (is (= 83.16 (m/approx (get-in f [:params :beta]))))
+    (is (= :mme (:method f)))))
+
 ;; bootstrap
 
 (deftest bootstrap-mle
@@ -187,4 +213,3 @@
   (let [d (:distribution (infer :weibull gb-serving))]
     (is (= 73 (int (r/mean d))))
     (is (= 1061 (int (r/variance d))))))
-

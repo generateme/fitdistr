@@ -131,16 +131,33 @@
     :else (mapv #(m/norm % 0 (dec len) 0.01 0.99) (range 0 len))))
 
 (defn- qme
-  [quantiles strategy measure data]
+  [quantiles strategy mse? data]
   (let [qs (cond
              (sequential? quantiles) quantiles
              (number? quantiles) (uniform-quantilies (long quantiles))
              :else (uniform-quantilies 50))
-        measure (if (= :mse measure) m/sq m/abs)
+        measure (if mse? m/sq m/abs)
         data-qs (stats/quantiles data qs strategy)]
     (fn [distr]
       (stats/mean (map (fn [^double q1 ^double q2]
                          (measure (- q1 q2))) data-qs (map (partial r/icdf distr) qs))))))
+
+(defn- mme
+  [mse? data]
+  (let [xs (m/seq->double-array data)
+        mean (stats/mean xs)
+        variance (stats/variance xs)
+        measure (if mse? m/sq m/abs)]
+    (fn [distr]
+      (let [^double tmean (r/mean distr)
+            ^double tvariance (r/variance distr)]
+        (if (or (m/nan? tmean)
+                (m/nan? tvariance)
+                (m/inf? tmean)
+                (m/inf? tvariance))
+          (throw (Exception. "Target distribution can't be used in mme method."))
+          (* 0.5 (+ ^double (measure (- mean tmean))
+                    ^double (measure (- variance tvariance)))))))))
 
 ;;
 
@@ -155,9 +172,10 @@
     :ad2r (anderson-darling-2r data)
     :ad2l (anderson-darling-2l data)
     :ad2 (anderson-darling-2 data)
-    :qme (let [{:keys [quantiles strategy qmeasure]
-                :or {quantiles 50 strategy :legacy qmeasure :mse}} params] (qme quantiles strategy qmeasure data))
+    :qme (let [{:keys [quantiles strategy mse?]
+                :or {quantiles 50 strategy :legacy mse? true}} params] (qme quantiles strategy mse? data))
     :mle (log-likelihood data)
+    :mme (mme (get params :mse? true) data)
     (throw (Exception. (str "Method " method " is not supported.")))))
 
 (defn- aic-bic
@@ -196,20 +214,20 @@
   [target method distribution data {:keys [optimizer]
                                     :or {optimizer :nelder-mead}
                                     :as all}]
-  (let [{:keys [param-names bounds inference] :as ddata} (distribution-data distribution)]
-    (let [opt-fn (method->opt-fn method) ;; minimize or maximize?
-          [pars result] (opt-fn optimizer target (merge {:initial (inference data)
-                                                         :max-iters 1000} all {:bounds bounds 
-                                                                               :bounded? true
-                                                                               :stats? false})) ;; optimize!
-          
-          conf (zipmap param-names pars) ;; create final distribution parametrization...
-          distr (r/distribution distribution conf)] ;; ...and distribution
-      (merge (calc-stats method distr data all result (count param-names)) ;; return result and statistics
-             {:params conf
-              :distribution-name distribution
-              :distribution distr
-              :method method}))))
+  (let [{:keys [param-names bounds inference]} (distribution-data distribution)
+        opt-fn (method->opt-fn method) ;; minimize or maximize?
+        [pars result] (opt-fn optimizer target (merge {:initial (inference data)
+                                                       :max-iters 1000} all {:bounds bounds 
+                                                                             :bounded? true
+                                                                             :stats? false})) ;; optimize!
+        
+        conf (zipmap param-names pars) ;; create final distribution parametrization...
+        distr (r/distribution distribution conf)] ;; ...and distribution
+    (merge (calc-stats method distr data all result (count param-names)) ;; return result and statistics
+           {:params conf
+            :distribution-name distribution
+            :distribution distr
+            :method method})))
 
 (defn- make-target
   [method distribution data all param-names]
@@ -227,6 +245,7 @@
   * `:ks` - Kolmogorov-Smirnov
   * `:cvm` - Cramer-von-Mises
   * `:qme` - quantile matching estimation.
+  * `:mme` - method of moments (modified)
 
   For QME additional parameters can be provided:
   
@@ -256,7 +275,7 @@
                        :or {assert? true}
                        :as params}]
    (let [{:keys [param-names validation inference]} (distribution-data distribution)]
-     (when (:assert? params) (assert (validation data) "Data values do not fit required distribution"))
+     (when assert? (assert (validation data) "Data values do not fit required distribution"))
      (let [conf (zipmap param-names (inference data))
            distr (r/distribution distribution conf)]
        (merge (calc-stats nil distr data (update params :stats conj :mle) nil (count param-names))
@@ -298,7 +317,7 @@
                                    all-params? false
                                    assert? true}
                               :as all}]
-   (let [{:keys [param-names bounds validation inference]} (distribution-data distribution)]
+   (let [{:keys [param-names bounds validation]} (distribution-data distribution)]
      (when assert? (assert-values data bounds validation all))
      (let [bdata (stats/bootstrap data samples size) ;; create sequences of bootstrapped data
            res (pmap #(fit method distribution % (-> all
@@ -307,7 +326,6 @@
            all-params (map vals (map :params res)) ;; extract found parameters
            extents (map (ci->fn ci-type) (apply map vector all-params)) ;; calculate extents for each parameter
            params (map last extents) ;; extract mean or median
-           param-names (:param-names (distribution-data distribution)) ;; extract parameter names
            conf (zipmap param-names params) ;; create distribution configuration
            distr (r/distribution distribution conf) ;; create distribution
            res (merge (calc-stats nil distr data (update all :stats conj method) nil (count param-names))
@@ -322,7 +340,9 @@
          (assoc res :all-params all-params)
          res)))))
 
-#_(def target (r/->seq (r/distribution :rayleigh {:a -3 :c 2 :beta 3}) 10000))
+#_(def target (r/->seq (r/distribution :weibull) 10000))
 #_(take 10 target)
 #_(infer :rayleigh target)
-#_(time (fit :mle :rayleigh target))
+#_(time (fit :mme :rayleigh target {:stats [:mle]
+                                    :mse? false}))
+
