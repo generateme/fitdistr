@@ -159,6 +159,20 @@
           (* 0.5 (+ ^double (measure (- mean tmean))
                     ^double (measure (- variance tvariance)))))))))
 
+(defn- mps
+  [data]
+  (let [c (count data)
+        fac (/ (double c) (inc c))
+        s (vec (sort (conj data ##-Inf ##Inf)))]
+    (fn [distr]
+      (let [starget (map (partial r/cdf distr) s)
+            diffs (map (fn [^double d1 ^double d2 ^double d3]
+                         (let [diff (- d2 d1)]
+                           (if (< diff 1.0e-200)
+                             (r/lpdf distr d3)
+                             (m/log diff)))) starget (rest starget) data)]
+        (* fac (stats/mean diffs))))))
+
 ;;
 
 (defn- method->fn
@@ -176,6 +190,7 @@
                 :or {quantiles 50 strategy :legacy mse? true}} params] (qme quantiles strategy mse? data))
     :mle (log-likelihood data)
     :mme (mme (get params :mse? true) data)
+    :mps (mps data)
     (throw (Exception. (str "Method " method " is not supported.")))))
 
 (defn- aic-bic
@@ -198,7 +213,7 @@
 
 (defn- method->opt-fn
   [method]
-  (if (= :mle method) o/maximize o/minimize))
+  (if (#{:mle :mps} method) o/maximize o/minimize))
 
 (defn- assert-values
   [data bounds validation {:keys [initial]}]
@@ -246,6 +261,7 @@
   * `:cvm` - Cramer-von-Mises
   * `:qme` - quantile matching estimation.
   * `:mme` - method of moments (modified)
+  * `:mps` - maximum product of spacing estimation
 
   For QME additional parameters can be provided:
   
@@ -340,9 +356,9 @@
          (assoc res :all-params all-params)
          res)))))
 
-#_(def target (r/->seq (r/distribution :weibull) 10000))
+#_(def target (r/->seq (r/distribution :cauchy {:median 2}) 1000))
 #_(take 10 target)
 #_(infer :rayleigh target)
-#_(time (fit :mme :rayleigh target {:stats [:mle]
-                                    :mse? false}))
+#_(time (fit :mps :normal target {:stats [:mle]
+                                  :mse? false}))
 

@@ -13,6 +13,7 @@ Entry point: `fit` function with supported methods:
     * Anderson-Darling - `:ad`, `:adr`, `:adl`, `:ad2r`, `:ad2l` and `:ad2`
 * Quantile matching estimation - `:qme`
 * Method of moments (modified) - `:mme`
+* Maximum (Product of) Spacing Estimation - `:mps`
 
 Additionally you can use:
 

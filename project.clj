@@ -1,5 +1,5 @@
 (defproject generateme/fitdistr "1.0.0-SNAPSHOT"
-  :description "Distribution fitting with MLE, MGE and QME methods."
+  :description "Distribution fitting with MLE, MGE, QME, MME and MPS methods (+ bootstrap)"
   :url "https://github.com/generateme/fitdistr"
   :license {:name "EPL-2.0 OR GPL-2.0-or-later WITH Classpath-exception-2.0"
             :url "https://www.eclipse.org/legal/epl-2.0/"}

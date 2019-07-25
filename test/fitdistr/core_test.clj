@@ -162,8 +162,6 @@
 
 ;; mme
 
-;; qme
-
 (deftest mme-norm
   (let [rng (r/rng :mersenne 1234)
         data (r/->seq (r/distribution :normal {:rng rng}) 100)
@@ -185,6 +183,30 @@
     (is (= 2.16 (m/approx (get-in f [:params :alpha]))))
     (is (= 83.16 (m/approx (get-in f [:params :beta]))))
     (is (= :mme (:method f)))))
+
+;; mps
+
+(deftest mps-norm
+  (let [rng (r/rng :mersenne 1234)
+        data (r/->seq (r/distribution :normal {:rng rng}) 100)
+        f (fit :mps :normal data {:mse? false
+                                  :stats [:mle]})]
+    (is (= -132.82577567491705 (get-in f [:stats :mle])))
+    (is (= -5.137601965261274 (get-in f [:stats :mps])))
+    (is (= 269.6515513498341 (get-in f [:stats :aic])))
+    (is (= 274.8618917218103 (get-in f [:stats :bic])))
+    (is (= -0.08525095610585526 (get-in f [:params :mu])))
+    (is (= 0.9291492108850101 (get-in f [:params :sd])))
+    (is (= :mps (:method f)))))
+
+(deftest mps-gb
+  (let [f (fit :mps :weibull gb-serving {:stats [:mle]})]
+    (is (= -4.76 (m/approx (get-in f [:stats :mps]))))
+    (is (= -1255.25 (m/approx (get-in f [:stats :mle]))))
+    (is (= 2.19 (m/approx (get-in f [:params :alpha]))))
+    (is (= 83.88 (m/approx (get-in f [:params :beta]))))
+    (is (= :mps (:method f)))))
+
 
 ;; bootstrap
 
