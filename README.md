@@ -335,7 +335,7 @@ For `fit` and `bootstrap` functions parameter optimization is used to minimize o
 Set `:optimizer` to select optimizer. Optimizer tuning is possible by setting parameters listed below.
 
 * `:gradient`
-    * `:gradient-size` - step size `h` in two-point finite difference formula used to calculate gradient
+    * `:gradient-h` - step size `h` in two-point finite difference formula used to calculate gradient
     * `:formula` - `:polak-riberie` (default) or `:fletcher-reeves`
 * `:nelder-mead` (default)
     * `:rho`, `:khi`, `:gamma`, `:sigma`
