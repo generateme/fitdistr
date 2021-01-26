@@ -4,15 +4,11 @@
             [fastmath.random :as r]
             [fastmath.stats :as stats]
             [fastmath.optimization :as o]
-            [fitdistr.distributions :refer :all]))
+            [fitdistr.distributions :refer [distribution-data]]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
 (m/use-primitive-operators)
-
-;;
-
-(defn- fast+ {:inline (fn [^double x ^double y] `(+ ~x ~y)) :inline-arities #{2}} ^double [^double a ^double b] (+ a b))
 
 ;; targets
 
@@ -41,8 +37,8 @@
         obsp (mapv (fn [^long i] (/ (dec (* 2 i)) n2)) (range 1 (inc n)))]
     (fn [distr]
       (let [F (map (partial r/cdf distr) s)]
-        (+ f12 ^double (reduce fast+ 0.0 (map (fn [^double f ^double o]
-                                                (m/sq (- f o))) F obsp)))))))
+        (+ f12 ^double (reduce m/fast+ 0.0 (map (fn [^double f ^double o]
+                                                  (m/sq (- f o))) F obsp)))))))
 
 (defn- anderson-darling
   [data]
@@ -63,7 +59,7 @@
         obsp (mapv (fn [^long i] (dec (* 2 i))) (range 1 (inc n)))]
     (fn [distr]
       (let [F (map (partial r/cdf distr) s)
-            res (- hn (* 2.0 ^double (reduce fast+ 0.0 F))
+            res (- hn (* 2.0 ^double (reduce m/fast+ 0.0 F))
                    (stats/mean (map (fn [^double o ^double fr]
                                       (* o (m/log (- 1.0 fr)))) obsp (reverse F))))]
         (if (m/nan? res) ##Inf res)))))
@@ -76,7 +72,7 @@
         obsp (mapv (fn [^long i] (dec (* 2 i))) (range 1 (inc n)))]
     (fn [distr]
       (let [F (map (partial r/cdf distr) s)
-            res (- (* 2.0 ^double (reduce fast+ 0.0 F)) n32
+            res (- (* 2.0 ^double (reduce m/fast+ 0.0 F)) n32
                    (stats/mean (map (fn [^double o ^double f]
                                       (* o (m/log f))) obsp F)))]
         (if (m/nan? res) ##Inf res)))))
@@ -88,8 +84,8 @@
         obsp (mapv (fn [^long i] (dec (* 2 i))) (range 1 (inc n)))]
     (fn [distr]
       (let [F (map (partial r/cdf distr) s)
-            res (+ (* 2.0 ^double (reduce fast+ 0.0 (map (fn [^double f]
-                                                           (m/log (- 1.0 f))) F)))
+            res (+ (* 2.0 ^double (reduce m/fast+ 0.0 (map (fn [^double f]
+                                                             (m/log (- 1.0 f))) F)))
                    (stats/mean (map (fn [^double o ^double fr]
                                       (/ o (- 1.0 fr))) obsp (reverse F))))]
         (if (m/nan? res) ##Inf res)))))
@@ -101,8 +97,8 @@
         obsp (mapv (fn [^long i] (dec (* 2 i))) (range 1 (inc n)))]
     (fn [distr]
       (let [F (map (partial r/cdf distr) s)
-            res (+ (* 2.0 ^double (reduce fast+ 0.0 (map (fn [^double f]
-                                                           (m/log f)) F)))
+            res (+ (* 2.0 ^double (reduce m/fast+ 0.0 (map (fn [^double f]
+                                                             (m/log f)) F)))
                    (stats/mean (map (fn [^double o ^double f]
                                       (/ o f)) obsp F)))]
         (if (m/nan? res) ##Inf res)))))
@@ -114,8 +110,8 @@
         obsp (mapv (fn [^long i] (dec (* 2 i))) (range 1 (inc n)))]
     (fn [distr]
       (let [F (map (partial r/cdf distr) s)
-            res (+ (* 2.0 ^double (reduce fast+ 0.0 (map (fn [^double f]
-                                                           (+ (m/log f) (m/log (- 1.0 f)))) F)))
+            res (+ (* 2.0 ^double (reduce m/fast+ 0.0 (map (fn [^double f]
+                                                             (+ (m/log f) (m/log (- 1.0 f)))) F)))
                    (stats/mean (map (fn [^double o ^double f ^double fr]
                                       (+ (/ o f) (/ o (- 1.0 fr)))) obsp F (reverse F))))]
         (if (m/nan? res) ##Inf res)))))
@@ -149,8 +145,8 @@
         variance (stats/variance xs)
         measure (if mse? m/sq m/abs)]
     (fn [distr]
-      (let [^double tmean (r/mean distr)
-            ^double tvariance (r/variance distr)]
+      (let [tmean (r/mean distr)
+            tvariance (r/variance distr)]
         (if (or (m/nan? tmean)
                 (m/nan? tvariance)
                 (m/inf? tmean)

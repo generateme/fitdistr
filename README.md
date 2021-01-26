@@ -1,6 +1,6 @@
 # Distribution Fitting in Clojure
 
-`[generateme/fitdistr "1.0.0-SNAPSHOT"]`
+`[generateme/fitdistr "1.0.0"]`
 
 Library provides the set of functions to fit univariate distribution to your (uncensored) data.
 
@@ -70,14 +70,22 @@ For bootstrap you receive additionally:
 
 Some validations on data and initial parameters are made.
 
+## Examples
+
+```clojure
+(require '[fastmath.random :as r]
+         '[fitdistr.core :refer :all]
+         '[fitdistr.distributions :refer [distribution-data]])
+```
+
 ### Example 1
 
 Proof that matching is accurate enough
 
 ```clojure
-(def target (r/->seq (r/distribution :weibull {:alpha 0.5 :beta 2.2}) 10000))
+(def target-data (r/->seq (r/distribution :weibull {:alpha 0.5 :beta 2.2}) 10000))
 
-(fit :ad :weibull target {:stats [:mle]})
+(fit :ad :weibull target-data {:stats [:mle]})
 ;; => {:stats
 ;;     {:ad 0.19749431207310408,
 ;;      :mle -19126.212671469282,
@@ -88,8 +96,8 @@ Proof that matching is accurate enough
 ;;     :distribution #object[org.apache.commons.math3.distribution.WeibullDistribution 0x430997b7 "org.apache.commons.math3.distribution.WeibullDistribution@430997b7"],
 ;;     :method :ad}
 
-(bootstrap :mle :weibull target {:stats #{:ad}
-                                :optimizer :nelder-mead})
+(bootstrap :mle :weibull target-data {:stats #{:ad}
+                                      :optimizer :nelder-mead})
 
 ;; => {:stats
 ;;     {:mle -19126.178345014738,
@@ -103,7 +111,7 @@ Proof that matching is accurate enough
 ;;     :distribution-name :weibull,
 ;;     :distribution #object[org.apache.commons.math3.distribution.WeibullDistribution 0x63a766b9 "org.apache.commons.math3.distribution.WeibullDistribution@63a766b9"]}
 
-(infer :weibull target {:stats #{:mle :ad}})
+(infer :weibull target-data {:stats #{:mle :ad}})
 ;; => {:stats
 ;;     {:mle -19126.13369575803,
 ;;      :ad 0.22838225327177497,
@@ -245,10 +253,10 @@ Let's see some plots:
 Bootstrap groundbeef data.
 
 ```clojure
-(def b-gamma (f/bootstrap :qme :gamma gb {:all-params? true
-                                          :ci-type :min-max-mean
-                                          :samples 10000
-                                          :size 100}))
+(def b-gamma (bootstrap :qme :gamma gb {:all-params? true
+                                        :ci-type :min-max-mean
+                                        :samples 10000
+                                        :size 100}))
 
 (count (:all-params b-gamma))
 ;; => 10000
@@ -263,10 +271,10 @@ Bootstrap groundbeef data.
 When low number of quantiles are used, different parameters are infered.
 
 ```clojure
-(def b-gamma-lowq (f/bootstrap :qme :gamma gb {:all-params? true
-                                               :quantiles 3
-                                               :samples 10000
-                                               :size 100}))
+(def b-gamma-lowq (bootstrap :qme :gamma gb {:all-params? true
+                                             :quantiles 3
+                                             :samples 10000
+                                             :size 100}))
 ```
 
 ![ex4-gamma-lowq](utils/ex4-gamma-lowq.jpg "Example 4 - gamma low q")
@@ -337,6 +345,8 @@ Set `:optimizer` to select optimizer. Optimizer tuning is possible by setting pa
 * `:gradient`
     * `:gradient-h` - step size `h` in two-point finite difference formula used to calculate gradient
     * `:formula` - `:polak-riberie` (default) or `:fletcher-reeves`
+* `:bfgs`
+    * `:gradient-h`
 * `:nelder-mead` (default)
     * `:rho`, `:khi`, `:gamma`, `:sigma`
     * `:side-length`

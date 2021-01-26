@@ -16,8 +16,8 @@
 (def ^:private positives (partial every? (fn [^double x] (pos? x))))
 (def ^:private non-negatives (partial every? (fn [^double x] (not (neg? x)))))
 (def ^:private zero-one (partial every? (fn [^double x] (< 0.0 x 1.0))))
-(def ^:private zero-or-one (partial every? (fn [^double x] (bool-or (zero? x)
-                                                                   (== x 1.0)))))
+(def ^:private zero-or-one (partial every? (fn [^double x] (or (zero? x)
+                                                              (== x 1.0)))))
 (def ^:private all-accepted (constantly true))
 
 (defn- log-data
@@ -300,16 +300,16 @@
    :validation non-negatives
    :inference infer-binomial})
 
-(defn- infer-bernoulli
-  [data]
-  (let [vx (m/seq->double-array data)
-        m (stats/mean vx)
-        v (stats/population-variance vx)
-        p (if (zero? m)
-            0.0
-            (/ (m/abs (- m v)) m))]
-    [p (if (zero? p) 20
-           (/ m p))]))
+#_(defn- infer-bernoulli
+    [data]
+    (let [vx (m/seq->double-array data)
+          m (stats/mean vx)
+          v (stats/population-variance vx)
+          p (if (zero? m)
+              0.0
+              (/ (m/abs (- m v)) m))]
+      [p (if (zero? p) 20
+             (/ m p))]))
 
 (defmethod distribution-data :bernoulli [_]
   {:param-names [:p]

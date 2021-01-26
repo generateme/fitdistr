@@ -30,7 +30,7 @@
 
 (deftest mle-data-fit-poisson-gradient
   (let [f (fit :mle :poisson usa-arrests-assault {:optimizer :gradient})]
-    (is (= 170.75999975700722 (get-in f [:params :p])))
+    (is (= 170.76 (m/approx (get-in f [:params :p]))))
     (is (= -1211.7 (m/approx (get-in f [:stats :mle]))))))
 
 (deftest mle-data-fit-poisson-gradient-start
