@@ -391,12 +391,13 @@ When calling fitting method you can provide additional parameters which are. All
 
 #### CI
 
-`bootstrap` generates sequence of parameters and they are also follows some distribution. Library provides various methods to analyze parameters from resampled data. `bootstrap` returns three values under `:ci` key: `[left,right,center]` where: `left` and `right` form interval and `center` is given statistic (mean or median). Following intervals are possible:
+`bootstrap` generates sequence of parameters and they also follow some distribution. Library provides various methods to analyze parameters from resampled data. `bootstrap` returns three values under `:ci` key: `[left,right,center]` where: `left` and `right` form interval and `center` is given statistic (mean or median). Following intervals are possible:
 
 * `:stddev-mean` - standard deviation and mean
 * `:mad-median` - median absolute deviation and median
 * `:sem-mean` - standard error of mean and mean
 * `:iqr-median` - IQR and median
+* `:percentile-bc` - Bias corrected percentile method
 * `:adj-median` - adjacent values and median
 * `:ci` - confidence interval based on Student's t-distribution and mean
 * `:min-max-mean` - minimum, maximum values and mean
@@ -408,6 +409,7 @@ Example: values of each type for 10000 samples from N(0,1)
  :mad-median   (-0.6564 0.6762 0.0099)
  :sem-mean     (-0.0053 0.0147 0.0047)
  :iqr-median   (-0.663 0.6699 0.0099)
+ :percentile-bc (-0.0714 0.0605 -0.0019)
  :adj-median   (-0.6564 0.6762 0.0099)
  :ci           (-0.0185 0.0279 0.0047)
  :min-max-mean (-3.9825 4.7877 0.0047)}
@@ -436,7 +438,7 @@ Also instead on fitting you can rely on `bootstrap` (espacially for big datasets
 * `:levy` requires `:gradient` optimizer to converge
 * `:johnson-su` inference only for xi and lambda, fits well
 * `:johnson-sl` inference doesn't calculate `gamma`, doesn't fit well
-* `:johnson-sb` inference is wrongm, but fits well
+* `:johnson-sb` inference is wrong, but fits well
 * `:frechet` inference is wrong, but fits well
 * for `:triangular` use inference only
 * `infer` doesn't return proper parameters in some cases for `:f`, `:nakagami`, `:levy`

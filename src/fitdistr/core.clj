@@ -9,7 +9,6 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
 (m/use-primitive-operators)
-
 ;; targets
 
 (defn- log-likelihood [data] (fn [distr] (r/log-likelihood distr data)))
@@ -305,6 +304,7 @@
     :mad-median stats/mad-extent
     :sem-mean stats/sem-extent
     :iqr-median stats/percentile-extent
+    :percentile-bc stats/percentile-bc-extent
     :adj-median stats/adjacent-values
     :ci stats/ci
     :min-max-mean stats/extent
@@ -357,4 +357,3 @@
 #_(infer :rayleigh target)
 #_(time (fit :mps :normal target {:stats [:mle]
                                   :mse? false}))
-
