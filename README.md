@@ -398,6 +398,7 @@ When calling fitting method you can provide additional parameters which are. All
 * `:sem-mean` - standard error of mean and mean
 * `:iqr-median` - IQR and median
 * `:percentile-bc` - Bias corrected percentile method
+* `:percentile-bca` - Accelerated bias corrected percentile method
 * `:adj-median` - adjacent values and median
 * `:ci` - confidence interval based on Student's t-distribution and mean
 * `:min-max-mean` - minimum, maximum values and mean
@@ -409,7 +410,8 @@ Example: values of each type for 10000 samples from N(0,1)
  :mad-median   (-0.6564 0.6762 0.0099)
  :sem-mean     (-0.0053 0.0147 0.0047)
  :iqr-median   (-0.663 0.6699 0.0099)
- :percentile-bc (-0.0714 0.0605 -0.0019)
+ :percentile-bc (-0.0219 0.0331 0.0069)
+ :percentile-bca (-0.0222 0.0328 0.0069)
  :adj-median   (-0.6564 0.6762 0.0099)
  :ci           (-0.0185 0.0279 0.0047)
  :min-max-mean (-3.9825 4.7877 0.0047)}
