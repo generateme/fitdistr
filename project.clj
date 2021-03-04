@@ -6,4 +6,4 @@
   :scm {:name "git"
         :url "https://github.com/generateme/fitdistr/"}  
   :dependencies [[org.clojure/clojure "1.10.2"]
-                 [generateme/fastmath "2.1.1"]])
+                 [generateme/fastmath "2.1.2"]])
