@@ -305,6 +305,7 @@
     :sem-mean stats/sem-extent
     :iqr-median stats/percentile-extent
     :percentile-bc stats/percentile-bc-extent
+    :percentile-bca stats/percentile-bca-extent
     :adj-median stats/adjacent-values
     :ci stats/ci
     :min-max-mean stats/extent
