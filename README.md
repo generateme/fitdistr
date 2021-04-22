@@ -28,11 +28,11 @@ For details please read [this paper](https://cran.r-project.org/web/packages/fit
 
 ## How does it work?
 
-For every method target function is created which accepts distribution parameters and returns log-likelihood, MSE/MAE of quantiles or differences between cdfs. Such function is minimized or maximized using one of available algorithms (gradient based or simplex based). Optimization is bounded. Initial values for optimization are infered from data.
+For every method target function is created which accepts distribution parameters and returns log-likelihood, MSE/MAE of quantiles or differences between cdfs. Such function is minimized or maximized using one of the available algorithms (gradient based or simplex based). Optimization is bounded. Initial values for optimization are infered from data.
 
-For bootstrap, sequences of resampled data are created and then each sequence is fitted. Best result (mean or median) is used as a final parametrization. Additionally confidence interval (or other ranges like irq or min-max) is returned.
+For a bootstrap, sequences of resampled data are created and then each sequence is fitted. Best result (mean or median) is used as a final parametrization. Additionally confidence interval (or other extent like iqr or min-max) is returned.
 
-Values of the any target function can be calculated and returned as fitness measure.
+Values of any target function can be calculated and returned as a fitness measure.
 
 ### Method of moments - modified version
 
@@ -68,13 +68,12 @@ For bootstrap you receive additionally:
 * `:all-params` - (optional) list of parameters for each resampled dataset
 * `:params` - best parametrization (mean or median, depending on confidence interval)
 
-Some validations on data and initial parameters are made.
+Some validations of the data and initial parameters are made.
 
 ## Examples
 
 ```clojure
-(require '[fastmath.random :as r]
-         '[fitdistr.core :refer :all]
+(require '[fitdistr.core :refer :all]
          '[fitdistr.distributions :refer [distribution-data]])
 ```
 
@@ -83,7 +82,7 @@ Some validations on data and initial parameters are made.
 Proof that matching is accurate enough
 
 ```clojure
-(def target-data (r/->seq (r/distribution :weibull {:alpha 0.5 :beta 2.2}) 10000))
+(def target-data (->seq (distribution :weibull {:alpha 0.5 :beta 2.2}) 10000))
 
 (fit :ad :weibull target-data {:stats [:mle]})
 ;; => {:stats
@@ -120,6 +119,87 @@ Proof that matching is accurate enough
 ;;     :params {:alpha 0.5012938746206328, :beta 2.215448048490149},
 ;;     :distribution-name :weibull,
 ;;     :distribution #object[org.apache.commons.math3.distribution.WeibullDistribution 0x3a0f2314 "org.apache.commons.math3.distribution.WeibullDistribution@3a0f2314"]}
+```
+
+#### Using the distribution
+
+```clojure
+(def inferred-distribution (fit :ad :weibull target-data {:stats [:mle]}))
+
+inferred-distribution
+;; => {:stats
+;;     {:ad 0.22793837346762302,
+;;      :mle -18836.462685291066,
+;;      :aic 37676.92537058213,
+;;      :bic 37691.34605132609},
+;;     :params {:alpha 0.5020961308787267, :beta 2.1661515133303646},
+;;     :distribution-name :weibull,
+;;     :distribution
+;;     #object[org.apache.commons.math3.distribution.WeibullDistribution 0x7f421db2 "org.apache.commons.math3.distribution.WeibullDistribution@7f421db2"],
+;;     :method :ad}
+
+(->distribution inferred-distribution)
+;; => #object[org.apache.commons.math3.distribution.WeibullDistribution 0x7f421db2 "org.apache.commons.math3.distribution.WeibullDistribution@7f421db2"]
+
+(cdf inferred-distribution 0.5)
+;; => 0.38057731286029817
+(cdf inferred-distribution 0.5 10.0)
+;; => 0.5035774570603441
+(pdf inferred-distribution 0.5)
+;; => 0.2979270382668242
+(lpdf inferred-distribution 0.5)
+;; => -1.2109066604852476
+(icdf inferred-distribution 0.5)
+;; => 1.0439237628813434
+(sample inferred-distribution)
+;; => 0.002386261009069703
+(log-likelihood inferred-distribution (take 10 target-data))
+;; => -24.233608452146168
+(likelihood inferred-distribution (take 10 target-data))
+;; => 2.988667305414128E-11
+(mean inferred-distribution)
+;; => 4.299110979375332
+(variance inferred-distribution)
+;; => 91.33715492734707
+(lower-bound inferred-distribution)
+;; => 0.0
+(upper-bound inferred-distribution)
+;; => ##Inf
+(distribution-id inferred-distribution)
+;; => :weibull
+(distribution-parameters inferred-distribution)
+;; => [:beta :alpha]
+(drandom inferred-distribution)
+;; => 7.4061584562769776
+(lrandom inferred-distribution)
+;; => 4
+(irandom inferred-distribution)
+;; => 40
+(set-seed! inferred-distribution 1337)
+(take 10 (->seq inferred-distribution))
+;; => (2.5184760984751717
+;;     2.9550268761778735
+;;     9.930032804583968
+;;     11.259341860117786
+;;     0.0808352042851777
+;;     17.399335542961957
+;;     0.0564922448326893
+;;     0.32170752149468795
+;;     6.063628565109016
+;;     2.2215931112225826)
+(set-seed! inferred-distribution 1337)
+(->seq inferred-distribution 10)
+;; => (2.5184760984751717
+;;     2.9550268761778735
+;;     9.930032804583968
+;;     11.259341860117786
+;;     0.0808352042851777
+;;     17.399335542961957
+;;     0.0564922448326893
+;;     0.32170752149468795
+;;     6.063628565109016
+;;     2.2215931112225826)
+
 ```
 
 ### Example 2
@@ -281,13 +361,21 @@ When low number of quantiles are used, different parameters are infered.
 
 ### Distributions
 
-A couple of words about distributions. All of them are backed by Apache Commons Math and SMILE libraries. They implement [DistributionProto](https://generateme.github.io/fastmath/fastmath.random.html#var-DistributionProto) with following methods:
+A couple of words about distributions. All of them are backed by Apache Commons Math and SMILE libraries. You can call following functions on distribution object or on fitting result.
 
 * `pdf` - density
+* `lpdf` - log density
 * `cdf` - cumulative density
 * `icdf` - inversed cumulative density or quantile
 * `probability` - pdf for continuous and probability for discrete densities
 * `sample` - random value from distribution
+* `log-likelihood` - log-likelihood of data
+* `likelihood` - likelihood of data
+* `mean` and `variance` of the distribution
+* `lower-bound` and `upper-bounds` - distribution support
+* `drandom`, `lrandom`, `irandom` - double/long/integer random sample from the distribution
+* `->seq` - generate sequence of samples
+* `set-seed!` - set distribution seed
 
 Parameter names for given distribution match mostly Apache Commons Math scheme and can differ from other sources (like Wikipedia or R). The list of supported distributions can be obtained by calling:
 
@@ -389,7 +477,7 @@ When calling fitting method you can provide additional parameters which are. All
 * `:ci-type` for `bootstrap` - interval type (see below), default: `:mad-median`
 * `:all-params?` for `bootstrap` - return list of parameters for each resampled sequence, default: `false`
 
-#### CI
+#### CI / extents
 
 `bootstrap` generates sequence of parameters and they also follow some distribution. Library provides various methods to analyze parameters from resampled data. `bootstrap` returns three values under `:ci` key: `[left,right,center]` where: `left` and `right` form interval and `center` is given statistic (mean or median). Following intervals are possible:
 
@@ -451,7 +539,7 @@ Also instead on fitting you can rely on `bootstrap` (espacially for big datasets
 
 ## License
 
-Copyright © 2019 GenerateMe
+Copyright © 2019-2021 GenerateMe
 
 This program and the accompanying materials are made available under the
 terms of the Eclipse Public License 2.0 which is available at

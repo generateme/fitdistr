@@ -4,14 +4,14 @@
             [fastmath.random :as r]
             [fastmath.stats :as stats]
             [fastmath.optimization :as o]
+            [fastmath.protocols :as prot]
             [fitdistr.distributions :refer [distribution-data]]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
 (m/use-primitive-operators)
-;; targets
 
-(defn- log-likelihood [data] (fn [distr] (r/log-likelihood distr data)))
+;; targets
 
 (defn- kolmogorov-smirnov
   [data]
@@ -183,7 +183,7 @@
     :ad2 (anderson-darling-2 data)
     :qme (let [{:keys [quantiles strategy mse?]
                 :or {quantiles 50 strategy :legacy mse? true}} params] (qme quantiles strategy mse? data))
-    :mle (log-likelihood data)
+    :mle (fn [distr] (r/log-likelihood distr data))
     :mme (mme (get params :mse? true) data)
     :mps (mps data)
     (throw (Exception. (str "Method " method " is not supported.")))))
@@ -353,8 +353,127 @@
          (assoc res :all-params all-params)
          res)))))
 
-#_(def target (r/->seq (r/distribution :cauchy {:median 2}) 1000))
-#_(take 10 target)
-#_(infer :rayleigh target)
-#_(time (fit :mps :normal target {:stats [:mle]
-                                  :mse? false}))
+;; 
+
+(def distribution r/distribution)
+
+(defn ->distribution
+  "Return distribution object"
+  [distr]
+  (cond
+    (satisfies? prot/DistributionProto distr) distr
+    (and (map? distr)
+         (:distribution distr)) (:distribution distr)
+    :else (throw (Exception. (str "Not a distribution: " distr)))))
+
+(defn cdf
+  "Cumulative probability."
+  (^double [d v] (prot/cdf (->distribution d) v))
+  (^double [d v1 v2] (prot/cdf (->distribution d) v1 v2)))
+
+(defn pdf
+  "Density"
+  ^double [d v] (prot/pdf (->distribution d) v))
+
+(defn lpdf
+  "Log density"
+  ^double [d v] (prot/lpdf (->distribution d) v))
+
+(defn icdf
+  "Inverse cumulative probability"
+  [d ^double v] (prot/icdf (->distribution d) v))
+
+(defn probability
+  "Probability (PMF)"
+  ^double [d v] (prot/probability (->distribution d) v))
+
+(defn sample
+  "Random sample"
+  [d] (prot/sample (->distribution d)))
+
+(defn observe1
+  "Log of probability/density of the value. Alias for [[lpdf]]."
+  ^double [d v]
+  (prot/lpdf (->distribution d) v))
+
+(defn log-likelihood
+  "Log likelihood of samples"
+  ^double [d vs]
+  (let [d (->distribution d)]
+    (reduce (fn [^double s ^double v] (if (m/invalid-double? s)
+                                       (reduced s)
+                                       (+ s v))) 0.0 (map #(prot/lpdf d %) vs))))
+
+(defmacro observe
+  "Log likelihood of samples. Alias for [[log-likelihood]]."
+  [d vs]
+  `(log-likelihood ~d ~vs))
+
+(defn likelihood
+  "Likelihood of samples"
+  ^double [d vs]
+  (m/exp (log-likelihood d vs)))
+
+(defn mean
+  "Distribution mean"
+  ^double [d] (prot/mean (->distribution d)))
+
+(defn variance
+  "Distribution variance"
+  ^double [d] (prot/variance (->distribution d)))
+
+(defn lower-bound
+  "Distribution lowest supported value"
+  ^double [d] (prot/lower-bound (->distribution d)))
+
+(defn upper-bound
+  "Distribution highest supported value"
+  ^double [d] (prot/upper-bound (->distribution d)))
+
+(defn distribution-id
+  "Distribution identifier as keyword."
+  [d] (prot/distribution-id (->distribution d)))
+
+(defn distribution-parameters
+  "Distribution highest supported value.
+  When `all?` is true, technical parameters are included, ie: `:rng` and `:inverser-cumm-accuracy`."
+  ([d] (distribution-parameters d false))
+  ([d all?]
+   (if-not all?
+     (-> (prot/distribution-parameters (->distribution d))
+         (set)
+         (disj :rng :inverse-cumm-accuracy)
+         (vec))
+     (prot/distribution-parameters (->distribution d)))))
+
+(defn drandom
+  "Return random double"
+  ^double [d]
+  (prot/drandom (->distribution d)))
+
+(defn lrandom
+  "Return random long"
+  ^long [d]
+  (prot/lrandom (->distribution d)))
+
+(defn irandom
+  "Return random integer"
+  ^long [d]
+  (prot/irandom (->distribution d)))
+
+(defn ->seq
+  "Return sequence of random values"
+  ([d] (prot/->seq (->distribution d)))
+  ([d n] (prot/->seq (->distribution d) n)))
+
+(defn set-seed!
+  "Set seed of the distribution, returns distribution object"
+  [d seed]
+  (prot/set-seed! (->distribution d) seed))
+
+(comment
+  (def target (r/->seq (r/distribution :cauchy {:median 2}) 1000))
+  (take 10 target)
+  (infer :rayleigh target)
+  (time (fit :mps :normal target {:stats [:mle]
+                                  :mse? false})))
