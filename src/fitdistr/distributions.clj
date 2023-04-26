@@ -534,3 +534,43 @@
    :bounds [bfull b0+]
    :validation all-accepted
    :inference infer-rayleigh})
+
+;; (sort (keys (methods distribution-data)))
+;; => (:bernoulli
+;;     :beta
+;;     :binomial
+;;     :cauchy
+;;     :chi
+;;     :chi-squared
+;;     :chi-squared-noncentral
+;;     :erlang
+;;     :exponential
+;;     :f
+;;     :fatigue-life
+;;     :frechet
+;;     :gamma
+;;     :geometric
+;;     :gumbel
+;;     :hyperbolic-secant
+;;     :inverse-gamma
+;;     :inverse-gaussian
+;;     :johnson-sb
+;;     :johnson-sl
+;;     :johnson-su
+;;     :laplace
+;;     :levy
+;;     :log-logistic
+;;     :log-normal
+;;     :logistic
+;;     :nakagami
+;;     :negative-binomial
+;;     :normal
+;;     :pareto
+;;     :pascal
+;;     :pearson-6
+;;     :poisson
+;;     :power
+;;     :rayleigh
+;;     :t
+;;     :triangular
+;;     :weibull)

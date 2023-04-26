@@ -361,7 +361,7 @@
   "Return distribution object"
   [distr]
   (cond
-    (satisfies? prot/DistributionProto distr) distr
+    (r/distribution? distr) distr
     (and (map? distr)
          (:distribution distr)) (:distribution distr)
     :else (throw (Exception. (str "Not a distribution: " distr)))))
@@ -477,3 +477,4 @@
   (infer :rayleigh target)
   (time (fit :mps :normal target {:stats [:mle]
                                   :mse? false})))
+
