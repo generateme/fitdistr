@@ -287,6 +287,8 @@
                        :as params}]
    (let [{:keys [param-names validation inference]} (distribution-data distribution)]
      (when assert? (assert (validation data) "Data values do not fit required distribution"))
+     (when assert? (assert (not (#{:frechet :johnson-sb} distribution))
+                           (str distribution " returns wrong pararameters (use fit instead of infer)")))
      (let [conf (zipmap param-names (inference data))
            distr (r/distribution distribution conf)]
        (merge (calc-stats nil distr data (update params :stats conj :mle) nil (count param-names))
@@ -478,3 +480,14 @@
   (time (fit :mps :normal target {:stats [:mle]
                                   :mse? false})))
 
+(comment
+  (def d (r/distribution :half-normal {:sigma 0.3}))
+  (def samples (r/->seq d 100))
+  (stats/maximum samples)
+  (stats/minimum samples)
+  (stats/mode samples :histogram {:bins (/ (count samples) 10)})
+  (stats/mean samples)
+  (r/variance d)
+  (r/mean d)
+  (infer :half-normal samples)
+  (fit :mle :half-normal samples))

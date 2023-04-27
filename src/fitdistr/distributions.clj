@@ -1,7 +1,8 @@
 (ns fitdistr.distributions
   "Distributions information necessary to infer parameters."
   (:require [fastmath.core :as m]
-            [fastmath.stats :as stats]))
+            [fastmath.stats :as stats]
+            [fastmath.solver :as solver]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
@@ -15,6 +16,7 @@
 
 (def ^:private positives (partial every? (fn [^double x] (pos? x))))
 (def ^:private non-negatives (partial every? (fn [^double x] (not (neg? x)))))
+(def ^:private one+ (partial every? (fn [^double x] (>= x 1.0))))
 (def ^:private zero-one (partial every? (fn [^double x] (< 0.0 x 1.0))))
 (def ^:private zero-or-one (partial every? (fn [^double x] (or (zero? x)
                                                               (== x 1.0)))))
@@ -32,11 +34,6 @@
         l (- q1 iqr15)
         u (+ q3 iqr15)]
     (filter (fn [^double v] (< l v u)) data)))
-
-(defn- continuous-mode
-  ^double [data]
-  (let [{:keys [^double step bins]} (stats/histogram data :sqrt)]
-    (+ (* 0.5 step) ^double (ffirst (sort-by second (fn [^double a ^double b] (> a b)) bins)))))
 
 (defmulti distribution-data (fn [k] k))
 
@@ -189,9 +186,9 @@
   [data]
   (let [xs (m/seq->double-array data)
         m (stats/mean xs)
-        d2 (if (< 1.0 m 100.0) (/ (+ m m) (dec m)) 1.0)
+        d2 (if (< 1.0 m 100.0) (/ (* 2.0 m) (dec m)) 1.0)
         p (/ d2 (+ d2 2.0))
-        mode (continuous-mode xs)
+        mode (stats/mode (filter-outliers xs) :histogram {:bins (max 1 (/ (alength xs) 10))})
         diff (- mode p)
         d1 (if (neg? diff) (/ (* -2.0 p) diff) 1.0)]
     [d1 d2]))
@@ -232,13 +229,15 @@
    :validation all-accepted
    :inference infer-laplace})
 
+(def ^{:private true :tag 'double} levy-const (* 2.0 (m/sq (m/inv-erfc 0.5))))
+
 (defn- infer-levy
   [data]
   (let [vs (m/seq->double-array data)
-        m (- (stats/minimum vs) 0.01)
-        mode (continuous-mode (filter-outliers vs))
-        c (* 3.0 (- mode m))] 
-    [(- m (* 0.05 c)) c]))
+        m (- (stats/minimum vs) m/EPSILON)
+        median (stats/median vs)
+        c (* levy-const (- median m))] 
+    [m c]))
 
 (defmethod distribution-data :levy [_]
   {:param-names [:mu :c]
@@ -261,10 +260,10 @@
 
 (defn- infer-nakagami
   [data]
-  (let [o (stats/mean (map m/sq data))
-        m (continuous-mode data)
-        mu (* 0.5 (/ o (- o (* m m))))]
-    [(max mu 1.0) o]))
+  (let [data2 (m/seq->double-array (map m/sq data))
+        omega (stats/mean data2)
+        mu (/ (* omega omega) (stats/variance data2))]
+    [mu omega]))
 
 (defmethod distribution-data :nakagami [_]
   {:param-names [:mu :omega]
@@ -299,17 +298,6 @@
    :bounds [b01 b1+]
    :validation non-negatives
    :inference infer-binomial})
-
-#_(defn- infer-bernoulli
-    [data]
-    (let [vx (m/seq->double-array data)
-          m (stats/mean vx)
-          v (stats/population-variance vx)
-          p (if (zero? m)
-              0.0
-              (/ (m/abs (- m v)) m))]
-      [p (if (zero? p) 20
-             (/ m p))]))
 
 (defmethod distribution-data :bernoulli [_]
   {:param-names [:p]
@@ -415,7 +403,7 @@
 (defn- infer-frechet
   [data]
   (let [xs (m/seq->double-array data)
-        mu (- (stats/minimum xs) 0.01)]
+        mu (- (stats/minimum xs) m/EPSILON)]
     (conj (vec (umontreal.ssj.probdist.FrechetDist/getMLE xs (alength xs) mu)) mu)))
 
 (defmethod distribution-data :frechet [_]
@@ -535,42 +523,92 @@
    :validation all-accepted
    :inference infer-rayleigh})
 
-;; (sort (keys (methods distribution-data)))
-;; => (:bernoulli
-;;     :beta
-;;     :binomial
-;;     :cauchy
-;;     :chi
-;;     :chi-squared
-;;     :chi-squared-noncentral
-;;     :erlang
-;;     :exponential
-;;     :f
-;;     :fatigue-life
-;;     :frechet
-;;     :gamma
-;;     :geometric
-;;     :gumbel
-;;     :hyperbolic-secant
-;;     :inverse-gamma
-;;     :inverse-gaussian
-;;     :johnson-sb
-;;     :johnson-sl
-;;     :johnson-su
-;;     :laplace
-;;     :levy
-;;     :log-logistic
-;;     :log-normal
-;;     :logistic
-;;     :nakagami
-;;     :negative-binomial
-;;     :normal
-;;     :pareto
-;;     :pascal
-;;     :pearson-6
-;;     :poisson
-;;     :power
-;;     :rayleigh
-;;     :t
-;;     :triangular
-;;     :weibull)
+(defn- infer-bb
+  [data]
+  (let [xs (m/seq->double-array data)
+        n (long (stats/maximum xs))
+        m1 (stats/mean xs)
+        m2 (stats/moment xs 2 {:center 0.0})
+        m2m1 (/ m2 m1) 
+        denom (/ (+ m1 (* n (- m2m1 m1 1.0))))
+        a (* (- (* n m1) m2) denom)
+        b (* (- n m1) (- n m2m1) denom)
+        ra+b (/ (+ a b))]
+    [(* a ra+b) ra+b n]))
+
+(defmethod distribution-data :bb [_]
+  {:param-names [:mu :sigma :bd]
+   :bounds [b01 b0+ b0+]
+   :validation non-negatives
+   :inference infer-bb})
+
+(defn- infer-logarithmic
+  [data]
+  (let [mu (stats/mean data)]
+    [(- 1.0 (solver/find-root (fn [^double t] (- (/ (dec t) (m/xlogx t)) mu))
+                              m/EPSILON (- 1.0 m/EPSILON)
+                              {:solver :bisection}))]))
+
+(defmethod distribution-data :logarithmic [_]
+  {:param-names [:theta]
+   :bounds [b01]
+   :validation one+
+   :inference infer-logarithmic})
+
+(defn- infer-half-normal
+  [data]
+  (let [sigma (m/sqrt (stats/mean (map m/sq data)))
+        cnt (* 4.0 (count data))]
+    [(* (/ (inc cnt) cnt) sigma)]))
+
+(defmethod distribution-data :half-normal [_]
+  {:param-names [:sigma]
+   :bounds [b0+]
+   :validation non-negatives
+   :inference infer-half-normal})
+
+
+(comment
+  (sort (keys (methods distribution-data)))
+  ;; => (:bb
+  ;;     :bernoulli
+  ;;     :beta
+  ;;     :binomial
+  ;;     :cauchy
+  ;;     :chi
+  ;;     :chi-squared
+  ;;     :chi-squared-noncentral
+  ;;     :erlang
+  ;;     :exponential
+  ;;     :f
+  ;;     :fatigue-life
+  ;;     :frechet
+  ;;     :gamma
+  ;;     :geometric
+  ;;     :gumbel
+  ;;     :half-normal
+  ;;     :hyperbolic-secant
+  ;;     :inverse-gamma
+  ;;     :inverse-gaussian
+  ;;     :johnson-sb
+  ;;     :johnson-sl
+  ;;     :johnson-su
+  ;;     :laplace
+  ;;     :levy
+  ;;     :log-logistic
+  ;;     :log-normal
+  ;;     :logarithmic
+  ;;     :logistic
+  ;;     :nakagami
+  ;;     :negative-binomial
+  ;;     :normal
+  ;;     :pareto
+  ;;     :pascal
+  ;;     :pearson-6
+  ;;     :poisson
+  ;;     :power
+  ;;     :rayleigh
+  ;;     :t
+  ;;     :triangular
+  ;;     :weibull)
+  )

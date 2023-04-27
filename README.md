@@ -382,7 +382,8 @@ Parameter names for given distribution match mostly Apache Commons Math scheme a
 
 ```clojure
 (sort (keys (methods distribution-data)))
-;; => (:bernoulli
+;; => (:bb
+;;     :bernoulli
 ;;     :beta
 ;;     :binomial
 ;;     :cauchy
@@ -397,6 +398,7 @@ Parameter names for given distribution match mostly Apache Commons Math scheme a
 ;;     :gamma
 ;;     :geometric
 ;;     :gumbel
+;;     :half-normal
 ;;     :hyperbolic-secant
 ;;     :inverse-gamma
 ;;     :inverse-gaussian
@@ -407,6 +409,7 @@ Parameter names for given distribution match mostly Apache Commons Math scheme a
 ;;     :levy
 ;;     :log-logistic
 ;;     :log-normal
+;;     :logarithmic
 ;;     :logistic
 ;;     :nakagami
 ;;     :negative-binomial
