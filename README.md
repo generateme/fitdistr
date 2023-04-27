@@ -1,4 +1,4 @@
-# Distribution Fitting in Clojure
+ # Distribution Fitting in Clojure
 
 [![Clojars Project](https://img.shields.io/clojars/v/generateme/fitdistr.svg)](https://clojars.org/generateme/fitdistr)
 
@@ -543,7 +543,7 @@ Also instead on fitting you can rely on `bootstrap` (espacially for big datasets
 
 ## License
 
-Copyright © 2019-2021 GenerateMe
+Copyright © 2019-2023 GenerateMe
 
 This program and the accompanying materials are made available under the
 terms of the Eclipse Public License 2.0 which is available at
