@@ -8,11 +8,11 @@
 (set! *unchecked-math* :warn-on-boxed)
 (m/use-primitive-operators)
 
-(defonce ^:private b0+ [1.0e-6 ##Inf])
-(defonce ^:private b01 [0.0 1.0])
-(defonce ^:private b05+ [0.5 ##Inf])
-(defonce ^:private b1+ [1.0 ##Inf])
-(defonce ^:private bfull [##-Inf ##Inf])
+(def ^:private b0+ [1.0e-4 ##Inf])
+(def ^:private b01 [0.0 1.0])
+(def ^:private b05+ [0.5 ##Inf])
+(def ^:private b1+ [1.0 ##Inf])
+(def ^:private bfull [##-Inf ##Inf])
 
 (def ^:private positives (partial every? (fn [^double x] (pos? x))))
 (def ^:private non-negatives (partial every? (fn [^double x] (not (neg? x)))))

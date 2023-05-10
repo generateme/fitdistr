@@ -222,11 +222,12 @@
 
 (defn- fit-
   [target method distribution data {:keys [optimizer]
-                                    :or {optimizer :nelder-mead}
+                                    :or {optimizer :lbfgsb}
                                     :as all}]
   (let [{:keys [param-names bounds inference]} (distribution-data distribution)
         opt-fn (method->opt-fn method) ;; minimize or maximize?
         [pars result] (opt-fn optimizer target (merge {:initial (inference data)
+                                                       :gradient-h 1.0e-5
                                                        :max-iters 1000} all {:bounds bounds 
                                                                              :bounded? true
                                                                              :stats? false})) ;; optimize!
@@ -244,7 +245,11 @@
   (let [raw-target (method->fn method data all)]
     (fn [& r]
       (let [d (r/distribution distribution (zipmap param-names r))]
-        (raw-target d)))))
+        (try
+          (raw-target d)
+          (catch Exception e
+            (do (.printStackTrace e)
+                ##NaN)))))))
 
 (defn fit
   "Fit distribution using given method
@@ -481,7 +486,7 @@
                                   :mse? false})))
 
 (comment
-  (def d (r/distribution :half-normal {:sigma 0.3}))
+  (def d (r/distribution :half-normal {:sigma 1.01}))
   (def samples (r/->seq d 100))
   (stats/maximum samples)
   (stats/minimum samples)

@@ -96,8 +96,7 @@ Proof that matching is accurate enough
 ;;     :distribution #object[org.apache.commons.math3.distribution.WeibullDistribution 0x430997b7 "org.apache.commons.math3.distribution.WeibullDistribution@430997b7"],
 ;;     :method :ad}
 
-(bootstrap :mle :weibull target-data {:stats #{:ad}
-                                      :optimizer :nelder-mead})
+(bootstrap :mle :weibull target-data {:stats #{:ad}})
 
 ;; => {:stats
 ;;     {:mle -19126.178345014738,
@@ -220,6 +219,7 @@ Search for the best distribution and its parameters. Look at last example where 
   [method ds]
   (let [selector (if (= method :mle) last first)]
     (dissoc (->> (map #(fit method % atv {:stats #{:mle :ad :ks :cvm}}) ds)
+                 (remove (fn [v] (Double/isNaN (method (:stats v)))))
                  (sort-by (comp method :stats))
                  (selector))
             :distribution)))
@@ -250,14 +250,14 @@ Search for the best distribution and its parameters. Look at last example where 
 
 (find-best :ks [:weibull :log-normal :gamma :exponential :normal :pareto])
 ;; => {:stats
-;;     {:ks 0.07692307692307693,
-;;      :cvm 0.11739378941793886,
-;;      :mle ##-Inf,
-;;      :ad ##Inf,
-;;      :aic ##Inf,
-;;      :bic ##Inf},
-;;     :params {:scale 0.36510648416477365, :shape 0.2649915952623174},
-;;     :distribution-name :pareto,
+;;     {:ks 0.10129796316277348,
+;;      :mle -535.0197747143928,
+;;      :cvm 0.3675703954412623,
+;;      :ad 3.830809551957188,
+;;      :aic 1074.0395494287857,
+;;      :bic 1079.3283312270685},
+;;     :params {:scale 2.03465815391538, :shape 2.873339450786136},
+;;     :distribution-name :log-normal,
 ;;     :method :ks}
 ```
 
@@ -434,12 +434,12 @@ For `fit` and `bootstrap` functions parameter optimization is used to minimize o
 
 Set `:optimizer` to select optimizer. Optimizer tuning is possible by setting parameters listed below.
 
+* `:lbfgsb` (default)
+    * `:gradient-h`
 * `:gradient`
     * `:gradient-h` - step size `h` in two-point finite difference formula used to calculate gradient
     * `:formula` - `:polak-riberie` (default) or `:fletcher-reeves`
-* `:bfgs`
-    * `:gradient-h`
-* `:nelder-mead` (default)
+* `:nelder-mead`
     * `:rho`, `:khi`, `:gamma`, `:sigma`
     * `:side-length`
 * `:multidirectional-simplex`
