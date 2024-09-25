@@ -1,6 +1,7 @@
 (ns fitdistr.distributions
   "Distributions information necessary to infer parameters."
   (:require [fastmath.core :as m]
+            [fastmath.special :as sp]
             [fastmath.stats :as stats]
             [fastmath.solver :as solver]))
 
@@ -9,6 +10,7 @@
 (m/use-primitive-operators)
 
 (def ^:private b0+ [1.0e-4 ##Inf])
+(def ^:private b0++ [0.02 ##Inf])
 (def ^:private b01 [0.0 1.0])
 (def ^:private b05+ [0.5 ##Inf])
 (def ^:private b1+ [1.0 ##Inf])
@@ -48,7 +50,7 @@
 
 (defmethod distribution-data :weibull [_]
   {:param-names [:alpha :beta]
-   :bounds [b0+ b0+]
+   :bounds [b0++ b0+]
    :validation positives
    :inference infer-weibull})
 
@@ -229,7 +231,7 @@
    :validation all-accepted
    :inference infer-laplace})
 
-(def ^{:private true :tag 'double} levy-const (* 2.0 (m/sq (m/inv-erfc 0.5))))
+(def ^{:private true :tag 'double} levy-const (* 2.0 (double (m/sq (sp/inv-erfc 0.5)))))
 
 (defn- infer-levy
   [data]
@@ -566,6 +568,8 @@
    :bounds [b0+]
    :validation non-negatives
    :inference infer-half-normal})
+
+(m/unuse-primitive-operators)
 
 
 (comment

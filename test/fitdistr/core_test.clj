@@ -79,7 +79,7 @@
 (deftest mge-cvm
   (let [f (fit :cvm :weibull gb-serving {:stats [:mle]})]
     (is (m/delta= 0.66 (m/approx (get-in f [:stats :cvm]))))
-    (is (m/delta= -1255.63 (m/approx (get-in f [:stats :mle]))))
+    (is (m/delta= -1255.62 (m/approx (get-in f [:stats :mle]))))
     (is (m/delta= 2.09 (m/approx (get-in f [:params :alpha]))))
     (is (m/delta= 82.66 (m/approx (get-in f [:params :beta]))))
     (is (= :cvm (:method f)))))
@@ -87,9 +87,9 @@
 (deftest mge-ks
   (let [f (fit :ks :weibull gb-serving {:stats [:mle]})]
     (is (m/delta= 0.11 (m/approx (get-in f [:stats :ks]))))
-    (is (m/delta= -1255.98 (m/approx (get-in f [:stats :mle]))))
-    (is (m/delta= 2.07 (m/approx (get-in f [:params :alpha]))))
-    (is (m/delta= 81.45 (m/approx (get-in f [:params :beta]))))
+    (is (m/delta= -1256.55 (m/approx (get-in f [:stats :mle]))))
+    (is (m/delta= 2.02 (m/approx (get-in f [:params :alpha]))))
+    (is (m/delta= 82.36 (m/approx (get-in f [:params :beta]))))
     (is (= :ks (:method f)))))
 
 (deftest mge-ad
@@ -121,13 +121,13 @@
     (is (m/delta= 11.56 (m/approx (get-in f [:stats :ad2r]))))
     (is (m/delta= -1259.11 (m/approx (get-in f [:stats :mle]))))
     (is (m/delta= 1.9 (m/approx (get-in f [:params :alpha]))))
-    (is (m/delta= 81.34 (m/approx (get-in f [:params :beta]))))
+    (is (m/delta= 81.33 (m/approx (get-in f [:params :beta]))))
     (is (= :ad2r (:method f)))))
 
 (deftest mge-ad2l
   (let [f (fit :ad2l :weibull gb-serving {:stats [:mle]})]
     (is (m/delta= 9.79 (m/approx (get-in f [:stats :ad2l]))))
-    (is (m/delta= -1265.95 (m/approx (get-in f [:stats :mle]))))
+    (is (m/delta= -1265.93 (m/approx (get-in f [:stats :mle]))))
     (is (m/delta= 2.48 (m/approx (get-in f [:params :alpha]))))
     (is (m/delta= 78.25 (m/approx (get-in f [:params :beta]))))
     (is (= :ad2l (:method f)))))
@@ -145,13 +145,13 @@
 (deftest qme-norm
   (let [f (fit :qme :normal data {:quantiles [m/THIRD m/TWO_THIRD]
                                   :stats [:mle]})]
-    (are [v k] (m/delta= v (get-in f k))
-      -153.49898608311454 [:stats :mle]
-      7.139135716668963E-12 [:stats :qme]
-      310.9979721662291 [:stats :aic]
-      316.2083125382053 [:stats :bic]
-      -0.08959004240194787 [:params :mu]
-      1.138457318184922 [:params :sd])
+    (are [v k] (m/delta= v (get-in f k) 1.0e-4 1.0e-4)
+      -153.49 [:stats :mle]
+      7.13E-12 [:stats :qme]
+      310.99 [:stats :aic]
+      316.21 [:stats :bic]
+      -0.0896 [:params :mu]
+      1.1385 [:params :sd])
     (is (= :qme (:method f)))))
 
 (deftest qme-gb
@@ -194,12 +194,12 @@
         data (r/->seq (r/distribution :normal {:rng rng}) 100)
         f (fit :mps :normal data {:mse? false
                                   :stats [:mle]})]
-    (is (m/delta= -153.48470657973516 (get-in f [:stats :mle])))
-    (is (m/delta= -5.187306023818127 (get-in f [:stats :mps])))
-    (is (m/delta= 310.9694131594703 (get-in f [:stats :aic])))
-    (is (m/delta= 316.1797535314465 (get-in f [:stats :bic])))
-    (is (m/delta= -0.15431246746578386 (get-in f [:params :mu])))
-    (is (m/delta= 1.1231921976781158 (get-in f [:params :sd])))
+    (is (m/delta= -153.484 (get-in f [:stats :mle]) 1.0e-3 1.0e-3))
+    (is (m/delta= -5.187 (get-in f [:stats :mps]) 1.0e-3) 1.0e-3)
+    (is (m/delta= 310.969 (get-in f [:stats :aic]) 1.0e-3) 1.0e-3)
+    (is (m/delta= 316.179 (get-in f [:stats :bic]) 1.0e-3) 1.0e-3)
+    (is (m/delta= -0.154 (get-in f [:params :mu]) 1.0e-3 1.0e-3))
+    (is (m/delta= 1.124 (get-in f [:params :sd]) 1.0e-3 1.0e-3))
     (is (= :mps (:method f)))))
 
 (deftest mps-gb
@@ -207,7 +207,7 @@
     (is (m/delta= -4.76 (m/approx (get-in f [:stats :mps]))))
     (is (m/delta= -1255.25 (m/approx (get-in f [:stats :mle]))))
     (is (m/delta= 2.19 (m/approx (get-in f [:params :alpha]))))
-    (is (m/delta= 83.88 (m/approx (get-in f [:params :beta]))))
+    (is (m/delta= 83.93 (m/approx (get-in f [:params :beta]))))
     (is (= :mps (:method f)))))
 
 

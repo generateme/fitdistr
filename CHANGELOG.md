@@ -1,5 +1,10 @@
 # Change log
 
+## [1.1.0-alpha]
+
+* update to the fastmath 3.0.0-alpha version
+* `:weibull` possible ranges fix
+
 ## [1.0.6]
 
 * `:lbfgsb` optimizer is now the default

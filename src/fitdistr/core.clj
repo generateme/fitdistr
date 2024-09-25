@@ -3,6 +3,7 @@
   (:require [fastmath.core :as m]
             [fastmath.random :as r]
             [fastmath.stats :as stats]
+            [fastmath.stats.bootstrap :as boot]
             [fastmath.optimization :as o]
             [fastmath.protocols :as prot]
             [fitdistr.distributions :refer [distribution-data]]))
@@ -36,8 +37,8 @@
         obsp (mapv (fn [^long i] (/ (dec (* 2 i)) n2)) (range 1 (inc n)))]
     (fn [distr]
       (let [F (map (partial r/cdf distr) s)]
-        (+ f12 ^double (reduce m/fast+ 0.0 (map (fn [^double f ^double o]
-                                                  (m/sq (- f o))) F obsp)))))))
+        (+ f12 ^double (reduce m/+ 0.0 (map (fn [^double f ^double o]
+                                              (m/sq (- f o))) F obsp)))))))
 
 (defn- anderson-darling
   [data]
@@ -58,7 +59,7 @@
         obsp (mapv (fn [^long i] (dec (* 2 i))) (range 1 (inc n)))]
     (fn [distr]
       (let [F (map (partial r/cdf distr) s)
-            res (- hn (* 2.0 ^double (reduce m/fast+ 0.0 F))
+            res (- hn (* 2.0 ^double (reduce m/+ 0.0 F))
                    (stats/mean (map (fn [^double o ^double fr]
                                       (* o (m/log (- 1.0 fr)))) obsp (reverse F))))]
         (if (m/nan? res) ##Inf res)))))
@@ -71,7 +72,7 @@
         obsp (mapv (fn [^long i] (dec (* 2 i))) (range 1 (inc n)))]
     (fn [distr]
       (let [F (map (partial r/cdf distr) s)
-            res (- (* 2.0 ^double (reduce m/fast+ 0.0 F)) n32
+            res (- (* 2.0 ^double (reduce m/+ 0.0 F)) n32
                    (stats/mean (map (fn [^double o ^double f]
                                       (* o (m/log f))) obsp F)))]
         (if (m/nan? res) ##Inf res)))))
@@ -83,8 +84,8 @@
         obsp (mapv (fn [^long i] (dec (* 2 i))) (range 1 (inc n)))]
     (fn [distr]
       (let [F (map (partial r/cdf distr) s)
-            res (+ (* 2.0 ^double (reduce m/fast+ 0.0 (map (fn [^double f]
-                                                             (m/log (- 1.0 f))) F)))
+            res (+ (* 2.0 ^double (reduce m/+ 0.0 (map (fn [^double f]
+                                                         (m/log (- 1.0 f))) F)))
                    (stats/mean (map (fn [^double o ^double fr]
                                       (/ o (- 1.0 fr))) obsp (reverse F))))]
         (if (m/nan? res) ##Inf res)))))
@@ -96,8 +97,8 @@
         obsp (mapv (fn [^long i] (dec (* 2 i))) (range 1 (inc n)))]
     (fn [distr]
       (let [F (map (partial r/cdf distr) s)
-            res (+ (* 2.0 ^double (reduce m/fast+ 0.0 (map (fn [^double f]
-                                                             (m/log f)) F)))
+            res (+ (* 2.0 ^double (reduce m/+ 0.0 (map (fn [^double f]
+                                                         (m/log f)) F)))
                    (stats/mean (map (fn [^double o ^double f]
                                       (/ o f)) obsp F)))]
         (if (m/nan? res) ##Inf res)))))
@@ -109,8 +110,8 @@
         obsp (mapv (fn [^long i] (dec (* 2 i))) (range 1 (inc n)))]
     (fn [distr]
       (let [F (map (partial r/cdf distr) s)
-            res (+ (* 2.0 ^double (reduce m/fast+ 0.0 (map (fn [^double f]
-                                                             (+ (m/log f) (m/log (- 1.0 f)))) F)))
+            res (+ (* 2.0 ^double (reduce m/+ 0.0 (map (fn [^double f]
+                                                         (+ (m/log f) (m/log (- 1.0 f)))) F)))
                    (stats/mean (map (fn [^double o ^double f ^double fr]
                                       (+ (/ o f) (/ o (- 1.0 fr)))) obsp F (reverse F))))]
         (if (m/nan? res) ##Inf res)))))
@@ -248,8 +249,8 @@
         (try
           (raw-target d)
           (catch Exception e
-            (do (.printStackTrace e)
-                ##NaN)))))))
+            (.printStackTrace e)
+            (throw e)))))))
 
 (defn fit
   "Fit distribution using given method
@@ -339,7 +340,7 @@
                               :as all}]
    (let [{:keys [param-names bounds validation]} (distribution-data distribution)]
      (when assert? (assert-values data bounds validation all))
-     (let [bdata (stats/bootstrap data samples size) ;; create sequences of bootstrapped data
+     (let [bdata (:samples (boot/bootstrap data nil {:samples samples :size size}))
            res (pmap #(fit method distribution % (-> all
                                                      (dissoc :stats)
                                                      (assoc :assert? false))) bdata) ;; fit paralelly (do not calculate stats)
@@ -360,7 +361,7 @@
          (assoc res :all-params all-params)
          res)))))
 
-;; 
+;;
 
 (def distribution r/distribution)
 
@@ -478,6 +479,11 @@
   [d seed]
   (prot/set-seed! (->distribution d) seed))
 
+(m/unuse-primitive-operators)
+
+
+;;;;;;; ignore
+
 (comment
   (def target (r/->seq (r/distribution :cauchy {:median 2}) 1000))
   (take 10 target)
@@ -496,3 +502,213 @@
   (r/mean d)
   (infer :half-normal samples)
   (fit :mle :half-normal samples))
+
+(comment
+  (def in [21 35 55 100 134 13 15 17 16 30 34 45 60 34 55])
+  (def in [16.5 48.5 2.5
+         41.25 9.5 27.75 17 2.5 8.25 9.75 35.25 8.5
+         3 14.5 11.5 12.25 7.5 2 25 17.5 33 5 9
+         4 27 29 19.5 4.75 3 32.25 10.5 3.5 15
+         6.75 15.25 16 2.25 1 1 1.5 4
+         6.75 9.5 7 7.5 6.5 9 25.25 3
+         1 1.5 1.25 4
+         3
+         3.25
+         16.75
+         6
+         11.25
+         4
+         7.75
+         16.25
+         15.25
+         2.75
+         1.25
+         15.5
+         4.75
+         16.75
+         7.25
+         7.25
+         10.75
+         6.5
+         49.25
+         10
+         5.25
+         8.5
+         1])
+  (def in [24
+         16
+         12
+         12
+         32
+         12
+         8
+         12
+         4
+         8
+         4
+         12
+         16
+         8
+         4
+         16
+         16
+         12
+         8
+         8
+         16
+         4
+         12
+         8
+         8
+         2
+         24
+         8
+         12
+         4
+         4
+         32
+         8
+         4
+         16
+         1
+         12
+         16
+         3
+         2
+         1
+         1
+         1
+         2
+         4
+         8
+         8
+         24
+         4
+         8
+         24
+         1
+         1
+         1
+         4
+         2
+         4
+         8
+         8
+         12
+         20
+         4
+         8
+         40
+         16
+         16
+         8
+         5
+         1
+         1
+         16
+         8
+         8
+         8
+         8
+         12
+         8
+         24
+         4
+         12
+         16
+         8
+         20
+         12
+         4
+         4
+         8
+         1
+         5
+         16
+         2
+         8
+         6
+         2
+         8
+         16
+         8
+         16
+         12
+         3
+         8
+         12])
+  (def in [13.0
+         2.0
+         5.0
+         8.0
+         13.0
+         3.0
+         3.0
+         3.0
+         3.0
+         3.0
+         13.0
+         3.0
+         3.0
+         5.0
+         3.0
+         3.0
+         3.0
+         3.0
+         3.0
+         2.0
+         5.0
+         3.0
+         3.0
+         5.0
+         5.0
+         3.0
+         3.0
+         3.0
+         2.0
+         3.0
+         8.0
+         13.0
+         5.0
+         8.0
+         8.0
+         1.0
+         13.0
+         13.0
+         3.0]
+    (def in [3,
+           4,
+           3,
+           13,
+           6,
+           30,
+           29,
+           2,
+           12,
+           40,
+           16,
+           382,
+           180,
+           36,
+           6,
+           49,
+           36,
+           13,
+           55,
+           12,
+           20]))
+  (stats/mean (map #(m/log %) in))
+  (stats/stddev (map #(m/log %) in))
+  (defn find-best
+    ([method ds] (find-best method ds in))
+    ([method ds data]
+     (let [selector (if (= method :mle) last first)]
+       (->> (map #(fit method % data {:stats #{:mle :ad :ks :cvm}}) ds)
+            (remove (fn [v] (Double/isNaN (method (:stats v)))))
+            (sort-by (comp method :stats))
+            (selector)))))
+  (def best (find-best :mle [:poisson :log-normal :gamma]))
+  (def best-distr (:distribution best))
+  (def means (repeatedly 2000 #(stats/mean (r/->seq best-distr 55))))
+  (def sums-distr (r/distribution :real-discrete-distribution {:data means}))
+  )
